@@ -9,8 +9,8 @@ from os import makedirs
 from os.path import join, exists
 import numpy as np
 from glob import glob
-import cPickle as pickle
-
+#import cPickle as pickle
+import pickle
 import tensorflow as tf
 
 from .common import float_feature
