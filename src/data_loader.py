@@ -65,7 +65,7 @@ class DataLoader(object):
             image_loader = self.get_loader_w3d()
         else:
             image_loader = self.get_loader()
-
+        # The image loader is a dictionary of image batch and 2d keypoint labels
         return image_loader
 
     def get_loader(self):
@@ -77,6 +77,7 @@ class DataLoader(object):
         files = data_utils.get_all_files(self.dataset_dir, self.datasets)
 
         do_shuffle = True
+        # Output strings (e.g. filenames) to a queue for an input pipeline.
         fqueue = tf.train.string_input_producer(
             files, shuffle=do_shuffle, name="input")
         image, label = self.read_data(fqueue, has_3d=False)
