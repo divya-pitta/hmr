@@ -64,6 +64,9 @@ class HMRTrainer(object):
         self.num_theta = 72  # 24 * 3
         self.total_params = self.num_theta + self.num_cam + 10
 
+        # Poses used for training
+        self.two_pose = config.two_pose
+
         # Data
         num_images = num_examples(config.datasets)
         num_mocap = num_examples(config.mocap_datasets)
@@ -72,13 +75,19 @@ class HMRTrainer(object):
         self.num_mocap_itr_per_epoch = num_mocap / self.batch_size
 
         # First make sure data_format is right
+        # Slim resnet wants data in NHWC format
         if self.data_format == 'NCHW':
             # B x H x W x 3 --> B x 3 x H x W
             data_loader['image'] = tf.transpose(data_loader['image'],
                                                 [0, 3, 1, 2])
-
-        self.image_loader = data_loader['image']
-        self.kp_loader = data_loader['label']
+        if not config.two_pose:
+            self.image_loader = data_loader['image']
+            self.kp_loader = data_loader['label']
+        else:
+            self.img1_loader = data_loader['image1']
+            self.kp1_loader = data_loader['label1']
+            self.img2_loader = data_loader['image2']
+            self.kp2_loader = data_loader['label2']
 
         if self.use_3d_label:
             self.poseshape_loader = data_loader['label3d']
@@ -104,6 +113,7 @@ class HMRTrainer(object):
         # Model spec
         self.model_type = config.model_type
         self.keypoint_loss = keypoint_l1_loss
+        #TODO: Add shape loss
 
         # Optimizer, learning rate
         self.e_lr = config.e_lr
@@ -131,6 +141,7 @@ class HMRTrainer(object):
                 resnet_vars = [
                     var for var in self.E_var if 'resnet_v2_50' in var.name
                 ]
+                # The saver saves the variables every number of epochs/hours you have configured it for
                 self.pre_train_saver = tf.train.Saver(resnet_vars)
             elif 'pose-tensorflow' in self.pretrained_model_path:
                 resnet_vars = [
@@ -142,11 +153,12 @@ class HMRTrainer(object):
 
             def load_pretrain(sess):
                 self.pre_train_saver.restore(sess, self.pretrained_model_path)
-
+            #the pretrained model is used to initialize the model
             init_fn = load_pretrain
 
         self.saver = tf.train.Saver(keep_checkpoint_every_n_hours=5)
         self.summary_writer = tf.summary.FileWriter(self.model_dir)
+        #Supervisor checkpoints models and computes summaries
         self.sv = tf.train.Supervisor(
             logdir=self.model_dir,
             global_step=self.global_step,
@@ -197,14 +209,27 @@ class HMRTrainer(object):
         self.mean_var = tf.Variable(
             mean, name="mean_param", dtype=tf.float32, trainable=True)
         self.E_var.append(self.mean_var)
-        init_mean = tf.tile(self.mean_var, [self.batch_size, 1])
+        #returns batchnum x meanparams
+        init_mean = tf.tle(self.mean_var, [self.batch_size, 1])
         return init_mean
 
     def build_model(self):
         img_enc_fn, threed_enc_fn = get_encoder_fn_separate(self.model_type)
         # Extract image features.
-        self.img_feat, self.E_var = img_enc_fn(
-            self.image_loader, weight_decay=self.e_wd, reuse=False)
+        if not self.two_pose:
+            self.img_feat, self.E_var = img_enc_fn(
+                self.image_loader, weight_decay=self.e_wd, reuse=False)
+        else:
+            self.img1_feat, self.E1_var = img_enc_fn(
+                self.img1_loader, weight_decay=self.e_wd, reuse=False
+            )
+            self.img2_feat, self.E2_var = img_enc_fn(
+                self.img2_loader, weight_decay=self.e_wd, reuse=True
+            )
+
+            #TODO: Should this be done or not?
+            self.E_var.extend(self.E1_var)
+            self.E_var.extend(self.E2_var)
 
         loss_kps = []
         if self.use_3d_label:
@@ -213,7 +238,11 @@ class HMRTrainer(object):
         fake_rotations, fake_shapes = [], []
         # Start loop
         # 85D
-        theta_prev = self.load_mean_param()
+        if not self.two_pose:
+            theta_prev = self.load_mean_param()
+        else:
+            theta1_prev = self.load_mean_param()
+            theta2_prev = self.load_mean_param()
 
         # For visualizations
         self.all_verts = []
@@ -226,51 +255,121 @@ class HMRTrainer(object):
         for i in np.arange(self.num_stage):
             print('Iteration %d' % i)
             # ---- Compute outputs
-            state = tf.concat([self.img_feat, theta_prev], 1)
+            if not self.two_pose:
+                state = tf.concat([self.img_feat, theta_prev], 1)
 
-            if i == 0:
-                delta_theta, threeD_var = threed_enc_fn(
-                    state,
-                    num_output=self.total_params,
-                    reuse=False)
-                self.E_var.extend(threeD_var)
+                if i == 0:
+                    delta_theta, threeD_var = threed_enc_fn(
+                        state,
+                        num_output=self.total_params,
+                        reuse=False)
+                    self.E_var.extend(threeD_var)
+                else:
+                    delta_theta, _ = threed_enc_fn(
+                        state, num_output=self.total_params, reuse=True)
+
+                # Compute new theta
+                theta_here = theta_prev + delta_theta
+                # cam = N x 3, pose N x self.num_theta, shape: N x 10
+                cams = theta_here[:, :self.num_cam]
+                poses = theta_here[:, self.num_cam:(self.num_cam + self.num_theta)]
+                shapes = theta_here[:, (self.num_cam + self.num_theta):]
+                # Rs_wglobal is Nx24x3x3 rotation matrices of poses
+                verts, Js, pred_Rs = self.smpl(shapes, poses, get_skin=True)
+                pred_kp = batch_orth_proj_idrot(
+                    Js, cams, name='proj2d_stage%d' % i)
+                # --- Compute losses:
+                loss_kps.append(self.e_loss_weight * self.keypoint_loss(
+                    self.kp_loader, pred_kp))
+                pred_Rs = tf.reshape(pred_Rs, [-1, 24, 9])
+                if self.use_3d_label:
+                    loss_poseshape, loss_joints = self.get_3d_loss(
+                        pred_Rs, shapes, Js)
+                    loss_3d_params.append(loss_poseshape)
+                    loss_3d_joints.append(loss_joints)
+
+                # Save pred_rotations for Discriminator
+                fake_rotations.append(pred_Rs[:, 1:, :])
+                fake_shapes.append(shapes)
+
+                # Save things for visualiations:
+                self.all_verts.append(tf.gather(verts, self.show_these))
+                self.all_pred_kps.append(tf.gather(pred_kp, self.show_these))
+                self.all_pred_cams.append(tf.gather(cams, self.show_these))
+
+                # Finally update to end iteration.
+                theta_prev = theta_here
+
             else:
-                delta_theta, _ = threed_enc_fn(
-                    state, num_output=self.total_params, reuse=True)
+                state1 = tf.concat([self.img1_feat, theta1_prev], 1)
+                state2 = tf.concat([self.img2_feat, theta2_prev], 1)
 
-            # Compute new theta
-            theta_here = theta_prev + delta_theta
-            # cam = N x 3, pose N x self.num_theta, shape: N x 10
-            cams = theta_here[:, :self.num_cam]
-            poses = theta_here[:, self.num_cam:(self.num_cam + self.num_theta)]
-            shapes = theta_here[:, (self.num_cam + self.num_theta):]
-            # Rs_wglobal is Nx24x3x3 rotation matrices of poses
-            verts, Js, pred_Rs = self.smpl(shapes, poses, get_skin=True)
-            pred_kp = batch_orth_proj_idrot(
-                Js, cams, name='proj2d_stage%d' % i)
-            # --- Compute losses:
-            loss_kps.append(self.e_loss_weight * self.keypoint_loss(
-                self.kp_loader, pred_kp))
-            pred_Rs = tf.reshape(pred_Rs, [-1, 24, 9])
-            if self.use_3d_label:
-                loss_poseshape, loss_joints = self.get_3d_loss(
-                    pred_Rs, shapes, Js)
-                loss_3d_params.append(loss_poseshape)
-                loss_3d_joints.append(loss_joints)
+                if i == 0:
+                    delta_theta1, threeD_var1 = threed_enc_fn(
+                        state1,
+                        num_output=self.total_params,
+                        reuse=False)
+                    delta_theta2, threeD_var2 = threed_enc_fn(
+                        state2,
+                        num_output=self.total_params,
+                        reuse=True)
+                    self.E_var.extend(threeD_var1)
+                    self.E_var.extend(threeD_var2)
+                else:
+                    delta_theta1, _ = threed_enc_fn(
+                        state1, num_output=self.total_params, reuse=True)
+                    delta_theta2, _ = threed_enc_fn(
+                        state2, num_output=self.total_params, reuse=True)
 
-            # Save pred_rotations for Discriminator
-            fake_rotations.append(pred_Rs[:, 1:, :])
-            fake_shapes.append(shapes)
+                # Compute new theta
+                theta1_here = theta1_prev + delta_theta1
+                theta2_here = theta2_prev + delta_theta2
 
-            # Save things for visualiations:
-            self.all_verts.append(tf.gather(verts, self.show_these))
-            self.all_pred_kps.append(tf.gather(pred_kp, self.show_these))
-            self.all_pred_cams.append(tf.gather(cams, self.show_these))
+                # cam = N x 3, pose N x self.num_theta, shape: N x 10
+                cams1 = theta1_here[:, :self.num_cam]
+                poses1 = theta1_here[:, self.num_cam:(self.num_cam + self.num_theta)]
+                shapes1 = theta1_here[:, (self.num_cam + self.num_theta):]
 
-            # Finally update to end iteration.
-            theta_prev = theta_here
+                cams2 = theta2_here[:, :self.num_cam]
+                poses2 = theta2_here[:, self.num_cam:(self.num_cam + self.num_theta)]
+                shapes2 = theta2_here[:, (self.num_cam + self.num_theta):]
 
-        if not self.encoder_only:
+                # Rs_wglobal is Nx24x3x3 rotation matrices of poses
+                verts1, Js1, pred_Rs1 = self.smpl(shapes1, poses1, get_skin=True)
+                pred_kp1 = batch_orth_proj_idrot(
+                    Js1, cams1, name='proj2d_stage%d' % i)
+
+                verts2, Js2, pred_Rs2 = self.smpl(shapes2, poses2, get_skin=True)
+                pred_kp2 = batch_orth_proj_idrot(
+                    Js2, cams2, name='proj2d_stage%d' % i)
+
+                # --- Compute losses:
+                loss_kps.append(self.e_loss_weight * (self.keypoint_loss(
+                    self.kp1_loader, pred_kp1) + self.keypoint_loss(
+                    self.kp2_loader, pred_kp2
+                )))
+
+                # pred_Rs = tf.reshape(pred_Rs, [-1, 24, 9])
+                # if self.use_3d_label:
+                #     loss_poseshape, loss_joints = self.get_3d_loss(
+                #         pred_Rs, shapes, Js)
+                #     loss_3d_params.append(loss_poseshape)
+                #     loss_3d_joints.append(loss_joints)
+                #
+                # # Save pred_rotations for Discriminator
+                # fake_rotations.append(pred_Rs[:, 1:, :])
+                # fake_shapes.append(shapes)
+
+                # Save things for visualiations:
+                self.all_verts.append(tf.gather(verts1, self.show_these))
+                self.all_pred_kps.append(tf.gather(pred_kp1, self.show_these))
+                self.all_pred_cams.append(tf.gather(cams1, self.show_these))
+
+                # Finally update to end iteration.
+                theta1_prev = theta1_here
+                theta2_prev = theta2_here
+
+        if not self.encoder_only and not self.two_pose:
             self.setup_discriminator(fake_rotations, fake_shapes)
 
         # Gather losses.
@@ -299,8 +398,12 @@ class HMRTrainer(object):
         self.all_verts = tf.stack(self.all_verts, axis=1)
         self.all_pred_kps = tf.stack(self.all_pred_kps, axis=1)
         self.all_pred_cams = tf.stack(self.all_pred_cams, axis=1)
-        self.show_imgs = tf.gather(self.image_loader, self.show_these)
-        self.show_kps = tf.gather(self.kp_loader, self.show_these)
+        if not self.two_pose:
+            self.show_imgs = tf.gather(self.image_loader, self.show_these)
+            self.show_kps = tf.gather(self.kp_loader, self.show_these)
+        else:
+            self.show_imgs = tf.gather(self.img1_loader, self.show_these)
+            self.show_kps = tf.gather(self.img2_loader, self.show_these)
 
         # Don't forget to update batchnorm's moving means.
         print('collecting batch norm moving means!!')

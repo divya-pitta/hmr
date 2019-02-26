@@ -77,6 +77,11 @@ flags.DEFINE_boolean(
     'use_3d_label', True,
     'Uses 3D labels if on.')
 
+flags.DEFINE_boolean(
+    'two_pose', False,
+    'Uses two poses to train the network'
+)
+
 # Hyper parameters:
 flags.DEFINE_float('e_lr', 0.001, 'Encoder learning rate')
 flags.DEFINE_float('d_lr', 0.001, 'Adversarial prior learning rate')
@@ -103,6 +108,10 @@ def get_config():
         setattr(config, 'img_size', 224)
         # Slim resnet wants NHWC..
         setattr(config, 'data_format', 'NHWC')
+
+    # Do not use the discriminator if using two pose images for shape and pose prediction
+    if config.two_pose:
+        config.encoder_only = True
 
     return config
 

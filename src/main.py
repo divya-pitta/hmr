@@ -18,7 +18,9 @@ def main(config):
     # Load data on CPU
     with tf.device("/cpu:0"):
         data_loader = DataLoader(config)
+        # 2D Images with 2d keypoints, and if present 3d SMPL keypoints too
         image_loader = data_loader.load()
+        # 3D human meshes in terms of pose and shape
         smpl_loader = data_loader.get_smpl_loader()
     #pdb.set_trace()
     trainer = HMRTrainer(config, image_loader, smpl_loader)
