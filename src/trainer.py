@@ -261,137 +261,137 @@ class HMRTrainer(object):
         for i in np.arange(self.num_stage):
             print('Iteration %d' % i)
             # ---- Compute outputs
-            # if not self.two_pose:
-            state = tf.concat([self.img_feat, theta_prev], 1)
+            if not self.two_pose:
+                state = tf.concat([self.img_feat, theta_prev], 1)
 
-            if i == 0:
-                delta_theta, threeD_var = threed_enc_fn(
-                    state,
-                    num_output=self.total_params,
-                    reuse=False)
-                self.E_var.extend(threeD_var)
+                if i == 0:
+                    delta_theta, threeD_var = threed_enc_fn(
+                        state,
+                        num_output=self.total_params,
+                        reuse=False)
+                    self.E_var.extend(threeD_var)
+                else:
+                    delta_theta, _ = threed_enc_fn(
+                        state, num_output=self.total_params, reuse=True)
+
+                # Compute new theta
+                theta_here = theta_prev + delta_theta
+                # cam = N x 3, pose N x self.num_theta, shape: N x 10
+                cams = theta_here[:, :self.num_cam]
+                poses = theta_here[:, self.num_cam:(self.num_cam + self.num_theta)]
+                shapes = theta_here[:, (self.num_cam + self.num_theta):]
+
+                # Rs_wglobal is Nx24x3x3 rotation matrices of poses
+                verts, Js, pred_Rs = self.smpl(shapes, poses, get_skin=True)
+                pred_kp = batch_orth_proj_idrot(
+                    Js, cams, name='proj2d_stage%d' % i)
+
+                # --- Compute losses:
+                loss_kps.append(self.e_loss_weight * self.keypoint_loss(
+                    self.kp_loader, pred_kp))
+                pred_Rs = tf.reshape(pred_Rs, [-1, 24, 9])
+
+                if self.use_3d_label:
+                    loss_poseshape, loss_joints = self.get_3d_loss(
+                        pred_Rs, shapes, Js)
+                    loss_3d_params.append(loss_poseshape)
+                    loss_3d_joints.append(loss_joints)
+
+                # Save pred_rotations for Discriminator
+                fake_rotations.append(pred_Rs[:, 1:, :])
+                fake_shapes.append(shapes)
+
+                # Save things for visualiations:
+                self.all_verts.append(tf.gather(verts, self.show_these))
+                self.all_pred_kps.append(tf.gather(pred_kp, self.show_these))
+                self.all_pred_cams.append(tf.gather(cams, self.show_these))
+
+                # Finally update to end iteration.
+                theta_prev = theta_here
+
             else:
-                delta_theta, _ = threed_enc_fn(
-                    state, num_output=self.total_params, reuse=True)
+                print("Two pose part")
+                state1 = tf.concat([self.img1_feat, theta1_prev], 1)
+                state2 = tf.concat([self.img2_feat, theta2_prev], 1)
 
-            # Compute new theta
-            theta_here = theta_prev + delta_theta
-            # cam = N x 3, pose N x self.num_theta, shape: N x 10
-            cams = theta_here[:, :self.num_cam]
-            poses = theta_here[:, self.num_cam:(self.num_cam + self.num_theta)]
-            shapes = theta_here[:, (self.num_cam + self.num_theta):]
+                if i == 0:
+                    delta_theta1, threeD_var1 = threed_enc_fn(
+                        state1,
+                        num_output=self.total_params,
+                        reuse=False)
+                    delta_theta2, threeD_var2 = threed_enc_fn(
+                        state2,
+                        num_output=self.total_params,
+                        reuse=True)
+                    self.E_var.extend(threeD_var1)
+                    self.E_var.extend(threeD_var2)
+                else:
+                    delta_theta1, _ = threed_enc_fn(
+                        state1, num_output=self.total_params, reuse=True)
+                    delta_theta2, _ = threed_enc_fn(
+                        state2, num_output=self.total_params, reuse=True)
 
-            # Rs_wglobal is Nx24x3x3 rotation matrices of poses
-            verts, Js, pred_Rs = self.smpl(shapes, poses, get_skin=True)
-            pred_kp = batch_orth_proj_idrot(
-                Js, cams, name='proj2d_stage%d' % i)
+                # Compute new theta
+                theta1_here = theta1_prev + delta_theta1
+                theta2_here = theta2_prev + delta_theta2
 
-            # --- Compute losses:
-            loss_kps.append(self.e_loss_weight * self.keypoint_loss(
-                self.kp_loader, pred_kp))
-            pred_Rs = tf.reshape(pred_Rs, [-1, 24, 9])
+                # cam = N x 3, pose N x self.num_theta, shape: N x 10
+                cams1 = theta1_here[:, :self.num_cam]
+                poses1 = theta1_here[:, self.num_cam:(self.num_cam + self.num_theta)]
+                shapes1 = theta1_here[:, (self.num_cam + self.num_theta):]
 
-            if self.use_3d_label:
-                loss_poseshape, loss_joints = self.get_3d_loss(
-                    pred_Rs, shapes, Js)
-                loss_3d_params.append(loss_poseshape)
-                loss_3d_joints.append(loss_joints)
+                cams2 = theta2_here[:, :self.num_cam]
+                poses2 = theta2_here[:, self.num_cam:(self.num_cam + self.num_theta)]
+                shapes2 = theta2_here[:, (self.num_cam + self.num_theta):]
 
-            # Save pred_rotations for Discriminator
-            fake_rotations.append(pred_Rs[:, 1:, :])
-            fake_shapes.append(shapes)
+                # Rs_wglobal is Nx24x3x3 rotation matrices of poses
+                verts1, Js1, pred_Rs1 = self.smpl(shapes1, poses1, get_skin=True)
+                pred_kp1 = batch_orth_proj_idrot(
+                    Js1, cams1, name='proj2d_stage%d' % i)
 
-            # Save things for visualiations:
-            self.all_verts.append(tf.gather(verts, self.show_these))
-            self.all_pred_kps.append(tf.gather(pred_kp, self.show_these))
-            self.all_pred_cams.append(tf.gather(cams, self.show_these))
+                verts2, Js2, pred_Rs2 = self.smpl(shapes2, poses2, get_skin=True)
+                pred_kp2 = batch_orth_proj_idrot(
+                    Js2, cams2, name='proj2d_stage%d' % i)
 
-            # Finally update to end iteration.
-            theta_prev = theta_here
+                start_time = time()
+                predJs2 = interpolate_spline(
+                    train_points=Js1,
+                    train_values=Js2,
+                    query_points=Js1,
+                    order=3,
+                   regularization_weight=0.1,
+               )
 
-            # else:
-            #     print("Two pose part")
-            #     state1 = tf.concat([self.img1_feat, theta1_prev], 1)
-            #     state2 = tf.concat([self.img2_feat, theta2_prev], 1)
-            #
-            #     if i == 0:
-            #         delta_theta1, threeD_var1 = threed_enc_fn(
-            #             state1,
-            #             num_output=self.total_params,
-            #             reuse=False)
-            #         delta_theta2, threeD_var2 = threed_enc_fn(
-            #             state2,
-            #             num_output=self.total_params,
-            #             reuse=True)
-            #         self.E_var.extend(threeD_var1)
-            #         self.E_var.extend(threeD_var2)
-            #     else:
-            #         delta_theta1, _ = threed_enc_fn(
-            #             state1, num_output=self.total_params, reuse=True)
-            #         delta_theta2, _ = threed_enc_fn(
-            #             state2, num_output=self.total_params, reuse=True)
-            #
-            #     # Compute new theta
-            #     theta1_here = theta1_prev + delta_theta1
-            #     theta2_here = theta2_prev + delta_theta2
-            #
-            #     # cam = N x 3, pose N x self.num_theta, shape: N x 10
-            #     cams1 = theta1_here[:, :self.num_cam]
-            #     poses1 = theta1_here[:, self.num_cam:(self.num_cam + self.num_theta)]
-            #     shapes1 = theta1_here[:, (self.num_cam + self.num_theta):]
-            #
-            #     cams2 = theta2_here[:, :self.num_cam]
-            #     poses2 = theta2_here[:, self.num_cam:(self.num_cam + self.num_theta)]
-            #     shapes2 = theta2_here[:, (self.num_cam + self.num_theta):]
-            #
-            #     # Rs_wglobal is Nx24x3x3 rotation matrices of poses
-            #     verts1, Js1, pred_Rs1 = self.smpl(shapes1, poses1, get_skin=True)
-            #     pred_kp1 = batch_orth_proj_idrot(
-            #         Js1, cams1, name='proj2d_stage%d' % i)
-            #
-            #     verts2, Js2, pred_Rs2 = self.smpl(shapes2, poses2, get_skin=True)
-            #     pred_kp2 = batch_orth_proj_idrot(
-            #         Js2, cams2, name='proj2d_stage%d' % i)
-            #
-            #     start_time = time()
-            #     predJs2 = interpolate_spline(
-            #         train_points=Js1,
-            #         train_values=Js2,
-            #         query_points=Js1,
-            #         order=3,
-            #        regularization_weight=0.1,
-            #    )
-            #
-            #     print("Time taken by interpolate_spline: ",time()-start_time)
-            #     predj_kp2 = batch_orth_proj_idrot(
-            #         predJs2, cams2, name='proj2d_stage%d' % i)
-		    #     # predj_kp2 = pred_kp2
-            #     # --- Compute losses:
-            #     loss_kps.append(self.e_loss_weight * (self.keypoint_loss(
-            #         self.kp1_loader, pred_kp1) + self.keypoint_loss(
-            #         self.kp2_loader, pred_kp2) + self.keypoint_loss(
-            #         self.kp2_loader, predj_kp2)
-            #     ))
-            #
-            #     # pred_Rs = tf.reshape(pred_Rs, [-1, 24, 9])
-            #     # if self.use_3d_label:
-            #     #     loss_poseshape, loss_joints = self.get_3d_loss(
-            #     #         pred_Rs, shapes, Js)
-            #     #     loss_3d_params.append(loss_poseshape)
-            #     #     loss_3d_joints.append(loss_joints)
-            #     #
-            #     # # Save pred_rotations for Discriminator
-            #     # fake_rotations.append(pred_Rs[:, 1:, :])
-            #     # fake_shapes.append(shapes)
-            #
-            #     # Save things for visualiations:
-            #     self.all_verts.append(tf.gather(verts1, self.show_these))
-            #     self.all_pred_kps.append(tf.gather(pred_kp1, self.show_these))
-            #     self.all_pred_cams.append(tf.gather(cams1, self.show_these))
-            #
-            #     # Finally update to end iteration.
-            #     theta1_prev = theta1_here
-            #     theta2_prev = theta2_here
+                print("Time taken by interpolate_spline: ",time()-start_time)
+                predj_kp2 = batch_orth_proj_idrot(
+                    predJs2, cams2, name='proj2d_stage%d' % i)
+		        # predj_kp2 = pred_kp2
+                # --- Compute losses:
+                loss_kps.append(self.e_loss_weight * (self.keypoint_loss(
+                    self.kp1_loader, pred_kp1) + self.keypoint_loss(
+                    self.kp2_loader, pred_kp2) + self.keypoint_loss(
+                    self.kp2_loader, predj_kp2)
+                ))
+
+                # pred_Rs = tf.reshape(pred_Rs, [-1, 24, 9])
+                # if self.use_3d_label:
+                #     loss_poseshape, loss_joints = self.get_3d_loss(
+                #         pred_Rs, shapes, Js)
+                #     loss_3d_params.append(loss_poseshape)
+                #     loss_3d_joints.append(loss_joints)
+                #
+                # # Save pred_rotations for Discriminator
+                # fake_rotations.append(pred_Rs[:, 1:, :])
+                # fake_shapes.append(shapes)
+
+                # Save things for visualiations:
+                self.all_verts.append(tf.gather(verts1, self.show_these))
+                self.all_pred_kps.append(tf.gather(pred_kp1, self.show_these))
+                self.all_pred_cams.append(tf.gather(cams1, self.show_these))
+
+                # Finally update to end iteration.
+                theta1_prev = theta1_here
+                theta2_prev = theta2_here
 
         if not self.encoder_only and not self.two_pose:
             self.setup_discriminator(fake_rotations, fake_shapes)
