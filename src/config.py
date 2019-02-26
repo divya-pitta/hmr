@@ -20,6 +20,7 @@ import numpy as np
 
 curr_path = osp.dirname(osp.abspath(__file__))
 model_dir = osp.join(curr_path, '..', 'models')
+logs_dir = '/hmrvol/hmr/logs/HMR_3DSUP_h36m-lsp_resnet_fc3_dropout_Elr1e-05_kp-weight60_Dlr1e-04_3dsup-weight60_Feb19_0135'
 if not osp.exists(model_dir):
     print('Fix path to models/')
     import ipdb
@@ -29,6 +30,7 @@ SMPL_FACE_PATH = osp.join(curr_path, '../src/tf_smpl', 'smpl_faces.npy')
 
 # Default pred-trained model path for the demo.
 PRETRAINED_MODEL = osp.join(model_dir, 'model.ckpt-667589')
+#PRETRAINED_MODEL = osp.join(logs_dir, 'model.ckpt-123995')
 
 flags.DEFINE_string('smpl_model_path', SMPL_MODEL_PATH,
                     'path to the neurtral smpl model')

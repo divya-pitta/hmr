@@ -10,6 +10,7 @@ from .config import get_config, prepare_dirs, save_config
 from .data_loader import DataLoader
 from .trainer import HMRTrainer
 
+import pdb
 
 def main(config):
     prepare_dirs(config)
@@ -19,7 +20,7 @@ def main(config):
         data_loader = DataLoader(config)
         image_loader = data_loader.load()
         smpl_loader = data_loader.get_smpl_loader()
-
+    #pdb.set_trace()
     trainer = HMRTrainer(config, image_loader, smpl_loader)
     save_config(config)
     trainer.train()

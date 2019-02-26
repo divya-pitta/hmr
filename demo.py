@@ -19,6 +19,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import matplotlib
+matplotlib.use('Agg')
+
 import sys
 from absl import flags
 import numpy as np
@@ -55,33 +58,33 @@ def visualize(img, proc_param, joints, verts, cam):
         vert_shifted, 60, cam=cam_for_render, img_size=img.shape[:2])
     rend_img_vp2 = renderer.rotated(
         vert_shifted, -60, cam=cam_for_render, img_size=img.shape[:2])
-
+    
     import matplotlib.pyplot as plt
     # plt.ion()
     plt.figure(1)
     plt.clf()
     plt.subplot(231)
-    plt.imshow(img)
+    plt.imsave("1.png",img)
     plt.title('input')
     plt.axis('off')
     plt.subplot(232)
-    plt.imshow(skel_img)
+    plt.imsave("skel_img.png",skel_img)
     plt.title('joint projection')
     plt.axis('off')
     plt.subplot(233)
-    plt.imshow(rend_img_overlay)
+    plt.imsave("rend_img_overlay.png",rend_img_overlay)
     plt.title('3D Mesh overlay')
     plt.axis('off')
     plt.subplot(234)
-    plt.imshow(rend_img)
+    plt.imsave("rend_img.png",rend_img)
     plt.title('3D mesh')
     plt.axis('off')
     plt.subplot(235)
-    plt.imshow(rend_img_vp1)
+    plt.imsave("rend_img_vp1.png",rend_img_vp1)
     plt.title('diff vp')
     plt.axis('off')
     plt.subplot(236)
-    plt.imshow(rend_img_vp2)
+    plt.imsave("rend_img_vp2.png",rend_img_vp2)
     plt.title('diff vp')
     plt.axis('off')
     plt.draw()
