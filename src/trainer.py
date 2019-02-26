@@ -18,6 +18,7 @@ from .tf_smpl.batch_smpl import SMPL
 from .tf_smpl.projection import batch_orth_proj_idrot
 
 from tensorflow.python.ops import control_flow_ops
+from tensorflow.contrib.image import interpolate_spline
 
 from time import time
 import tensorflow as tf
@@ -84,10 +85,14 @@ class HMRTrainer(object):
             self.image_loader = data_loader['image']
             self.kp_loader = data_loader['label']
         else:
-            self.img1_loader = data_loader['image1']
-            self.kp1_loader = data_loader['label1']
-            self.img2_loader = data_loader['image2']
-            self.kp2_loader = data_loader['label2']
+            # self.img1_loader = data_loader['image1']
+            # self.kp1_loader = data_loader['label1']
+            # self.img2_loader = data_loader['image2']
+            # self.kp2_loader = data_loader['label2']
+            self.img1_loader = data_loader['image']
+            self.kp1_loader = data_loader['label']
+            self.img2_loader = data_loader['image']
+            self.kp2_loader = data_loader['label']
 
         if self.use_3d_label:
             self.poseshape_loader = data_loader['label3d']
@@ -274,14 +279,17 @@ class HMRTrainer(object):
                 cams = theta_here[:, :self.num_cam]
                 poses = theta_here[:, self.num_cam:(self.num_cam + self.num_theta)]
                 shapes = theta_here[:, (self.num_cam + self.num_theta):]
+
                 # Rs_wglobal is Nx24x3x3 rotation matrices of poses
                 verts, Js, pred_Rs = self.smpl(shapes, poses, get_skin=True)
                 pred_kp = batch_orth_proj_idrot(
                     Js, cams, name='proj2d_stage%d' % i)
+
                 # --- Compute losses:
                 loss_kps.append(self.e_loss_weight * self.keypoint_loss(
                     self.kp_loader, pred_kp))
                 pred_Rs = tf.reshape(pred_Rs, [-1, 24, 9])
+
                 if self.use_3d_label:
                     loss_poseshape, loss_joints = self.get_3d_loss(
                         pred_Rs, shapes, Js)
@@ -301,6 +309,7 @@ class HMRTrainer(object):
                 theta_prev = theta_here
 
             else:
+                print("Two pose part")
                 state1 = tf.concat([self.img1_feat, theta1_prev], 1)
                 state2 = tf.concat([self.img2_feat, theta2_prev], 1)
 
@@ -343,11 +352,25 @@ class HMRTrainer(object):
                 pred_kp2 = batch_orth_proj_idrot(
                     Js2, cams2, name='proj2d_stage%d' % i)
 
+                start_time = time()
+                predJs2 = interpolate_spline(
+                    train_points=Js1,
+                    train_values=Js2,
+                    query_points=Js1,
+                    order=3,
+                    regularization_weight=0.1,
+                )
+
+                print("Time taken by interpolate_spline: ",time()-start_time)
+                predj_kp2 = batch_orth_proj_idrot(
+                    predJs2, cams2, name='proj2d_stage%d' % i)
+
                 # --- Compute losses:
                 loss_kps.append(self.e_loss_weight * (self.keypoint_loss(
                     self.kp1_loader, pred_kp1) + self.keypoint_loss(
-                    self.kp2_loader, pred_kp2
-                )))
+                    self.kp2_loader, pred_kp2) + self.keypoint_loss(
+                    self.kp2_loader, predj_kp2)
+                ))
 
                 # pred_Rs = tf.reshape(pred_Rs, [-1, 24, 9])
                 # if self.use_3d_label:
@@ -387,6 +410,10 @@ class HMRTrainer(object):
                 self.e_loss_3d_joints = loss_3d_joints[-1]
 
                 self.e_loss += (self.e_loss_3d + self.e_loss_3d_joints)
+
+            if self.two_pose:
+                self.shape_loss = tf.losses.absolute_difference(shapes1, shapes2)
+                self.e_loss += self.shape_loss
 
         if not self.encoder_only:
             with tf.name_scope("gather_d_loss"):
