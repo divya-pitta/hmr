@@ -112,7 +112,7 @@ def get_config():
     # Do not use the discriminator if using two pose images for shape and pose prediction
     if config.two_pose:
         config.encoder_only = True
-
+	config.use_3d_label = False
     return config
 
 

@@ -18,7 +18,9 @@ from .tf_smpl.batch_smpl import SMPL
 from .tf_smpl.projection import batch_orth_proj_idrot
 
 from tensorflow.python.ops import control_flow_ops
-from tensorflow.contrib.image import interpolate_spline
+#from tensorflow.contrib.image import interpolate_spline
+from .interpolate_spline import interpolate_spline
+#import interpolate_spline
 
 from time import time
 import tensorflow as tf
@@ -139,42 +141,42 @@ class HMRTrainer(object):
 
         # Logging
         init_fn = None
-        if self.use_pretrained():
-            # Make custom init_fn
-            print("Fine-tuning from %s" % self.pretrained_model_path)
-            if 'resnet_v2_50' in self.pretrained_model_path:
-                resnet_vars = [
-                    var for var in self.E_var if 'resnet_v2_50' in var.name
-                ]
-                # The saver saves the variables every number of epochs/hours you have configured it for
-                self.pre_train_saver = tf.train.Saver(resnet_vars)
-            elif 'pose-tensorflow' in self.pretrained_model_path:
-                resnet_vars = [
-                    var for var in self.E_var if 'resnet_v1_101' in var.name
-                ]
-                self.pre_train_saver = tf.train.Saver(resnet_vars)
-            else:
-                self.pre_train_saver = tf.train.Saver()
+	if self.use_pretrained():
+	    # Make custom init_fn
+	    print("Fine-tuning from %s" % self.pretrained_model_path)
+	    if 'resnet_v2_50' in self.pretrained_model_path:
+		resnet_vars = [
+		    var for var in self.E_var if 'resnet_v2_50' in var.name
+		]
+		# The saver saves the variables every number of epochs/hours you have configured it for
+		self.pre_train_saver = tf.train.Saver(resnet_vars)
+	    elif 'pose-tensorflow' in self.pretrained_model_path:
+		resnet_vars = [
+		    var for var in self.E_var if 'resnet_v1_101' in var.name
+		]
+		self.pre_train_saver = tf.train.Saver(resnet_vars)
+	    else:
+		self.pre_train_saver = tf.train.Saver()
 
-            def load_pretrain(sess):
-                self.pre_train_saver.restore(sess, self.pretrained_model_path)
-            #the pretrained model is used to initialize the model
-            init_fn = load_pretrain
+	    def load_pretrain(sess):
+		self.pre_train_saver.restore(sess, self.pretrained_model_path)
+	    #the pretrained model is used to initialize the model
+	    init_fn = load_pretrain
 
-        self.saver = tf.train.Saver(keep_checkpoint_every_n_hours=5)
-        self.summary_writer = tf.summary.FileWriter(self.model_dir)
-        #Supervisor checkpoints models and computes summaries
-        self.sv = tf.train.Supervisor(
-            logdir=self.model_dir,
-            global_step=self.global_step,
-            saver=self.saver,
-            summary_writer=self.summary_writer,
-            init_fn=init_fn)
-        gpu_options = tf.GPUOptions(allow_growth=True)
-        self.sess_config = tf.ConfigProto(
-            allow_soft_placement=False,
-            log_device_placement=False,
-            gpu_options=gpu_options)
+	self.saver = tf.train.Saver(keep_checkpoint_every_n_hours=5)
+	self.summary_writer = tf.summary.FileWriter(self.model_dir)
+	#Supervisor checkpoints models and computes summaries
+	self.sv = tf.train.Supervisor(
+	    logdir=self.model_dir,
+	    global_step=self.global_step,
+	    saver=self.saver,
+	    summary_writer=self.summary_writer,
+	    init_fn=init_fn)
+	gpu_options = tf.GPUOptions(allow_growth=True)
+	self.sess_config = tf.ConfigProto(
+	    allow_soft_placement=False,
+	    log_device_placement=False,
+	    gpu_options=gpu_options)
 
     def use_pretrained(self):
         """
@@ -215,7 +217,7 @@ class HMRTrainer(object):
             mean, name="mean_param", dtype=tf.float32, trainable=True)
         self.E_var.append(self.mean_var)
         #returns batchnum x meanparams
-        init_mean = tf.tle(self.mean_var, [self.batch_size, 1])
+        init_mean = tf.tile(self.mean_var, [self.batch_size, 1])
         return init_mean
 
     def build_model(self):
@@ -234,7 +236,7 @@ class HMRTrainer(object):
 
             #TODO: Should this be done or not?
             self.E_var.extend(self.E1_var)
-            self.E_var.extend(self.E2_var)
+            #self.E_var.extend(self.E2_var)
 
         loss_kps = []
         if self.use_3d_label:
@@ -358,13 +360,13 @@ class HMRTrainer(object):
                     train_values=Js2,
                     query_points=Js1,
                     order=3,
-                    regularization_weight=0.1,
-                )
+                   regularization_weight=0.1,
+               )
 
                 print("Time taken by interpolate_spline: ",time()-start_time)
                 predj_kp2 = batch_orth_proj_idrot(
                     predJs2, cams2, name='proj2d_stage%d' % i)
-
+		predj_kp2 = pred_kp2
                 # --- Compute losses:
                 loss_kps.append(self.e_loss_weight * (self.keypoint_loss(
                     self.kp1_loader, pred_kp1) + self.keypoint_loss(
