@@ -63,6 +63,8 @@ class DataLoader(object):
     def load(self):
         if self.use_3d_label:
             image_loader = self.get_loader_w3d()
+        elif self.config.two_pose:
+            image_loader = self.get_loader_paired()
         else:
             image_loader = self.get_loader()
         # The image loader is a dictionary of image batch and 2d keypoint labels
@@ -101,6 +103,41 @@ class DataLoader(object):
             batch_dict[name] = batch
 
         return batch_dict
+
+
+    def get_loader_paired(self):
+        """
+        Outputs:
+          image_batch: batched images im1, im2 as per data_format
+          label_batch: batched keypoint kps1, kps2 labels N x K x 3
+        """
+        files = data_utils.get_all_files_paired(self.dataset_dir, ['paired_h36m'])
+	do_shuffle = True
+        fqueue = tf.train.string_input_producer(
+            files, shuffle=do_shuffle, name="input")
+        image1, label1, image2, label2 = self.read_data_paired(fqueue, has_3d=False)
+        min_after_dequeue = 5000
+        num_threads = 8
+        capacity = min_after_dequeue + 3 * self.batch_size
+
+        pack_these = [image1, label1, image2, label2]
+        pack_name = ['image1', 'label1', 'image2', 'label2']
+
+        all_batched = tf.train.shuffle_batch(
+            pack_these,
+            batch_size=self.batch_size,
+            num_threads=num_threads,
+            capacity=capacity,
+            min_after_dequeue=min_after_dequeue,
+            enqueue_many=False,
+            name='input_batch_train')
+
+        batch_dict = {}
+        for name, batch in zip(pack_name, all_batched):
+            batch_dict[name] = batch
+
+        return batch_dict
+
 
     def get_loader_w3d(self):
         """
@@ -271,6 +308,51 @@ class DataLoader(object):
                 return image, label, label3d, has_smpl3d
             else:
                 return image, label
+
+    def read_data_paired(self, filename_queue, has_3d=False):
+        with tf.name_scope(None, 'read_data', [filename_queue]):
+            reader = tf.TFRecordReader()
+            _, example_serialized = reader.read(filename_queue)
+            if has_3d:
+                image1, image_size1, label1, center1, fname1, pose1, shape1, gt3d1, has_smpl3d1,\
+                image2, image_size2, label2, center2, fname2, pose2, shape2, gt3d2, has_smpl3d2, = \
+                data_utils.parse_example_paired_proto(example_serialized, has_3d=has_3d)
+                # Need to send pose bc image can get flipped.
+                image1, label1, pose1, gt3d1 = self.image_preprocessing(
+                    image1, image_size1, label1, center1, pose=pose1, gt3d=gt3d1)
+                image2, label2, pose2, gt3d2 = self.image_preprocessing(
+                    image2, image_size2, label2, center2, pose=pose2, gt3d=gt3d2)
+
+                # Convert pose to rotation.
+                # Do not ignore the global!!
+                rotations1 = batch_rodrigues(tf.reshape(pose1, [-1, 3]))
+                rotations2 = batch_rodrigues(tf.reshape(pose2, [-1, 3]))
+                gt3d_flat1 = tf.reshape(gt3d1, [-1])
+                gt3d_flat2 = tf.reshape(gt3d2, [-1])
+                # Label 3d is:
+                #   [rotations, shape-beta, 3Djoints]
+                #   [216=24*3*3, 10, 42=14*3]
+                label3d1 = tf.concat(
+                    [tf.reshape(rotations1, [-1]), shape1, gt3d_flat1], 0)
+                label3d2 = tf.concat(
+                    [tf.reshape(rotations2, [-1]), shape2, gt3d_flat2], 0)
+            else:
+                image1, image_size1, label1, center1, fname1, \
+                image2, image_size2, label2, center2, fname2 = data_utils.parse_example_paired_proto(
+                    example_serialized)
+                image1, label1 = self.image_preprocessing(
+                    image1, image_size1, label1, center1)
+                image2, label2 = self.image_preprocessing(
+                    image2, image_size2, label2, center2)
+
+            # label should be K x 3
+            label1 = tf.transpose(label1)
+            label2 = tf.transpose(label2)
+
+            if has_3d:
+                return image1, label1, label3d1, has_smpl3d1, image2, label2, label3d2, has_smpl3d2
+            else:
+                return image1, label1, image2, label2
 
     def image_preprocessing(self,
                             image,

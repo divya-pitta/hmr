@@ -99,6 +99,30 @@ def parse_example_proto(example_serialized, has_3d=False):
         return image, image_size, label, center, fname
 
 
+def parse_example_paired_proto(example_serialized, has_3d=False):
+    feature_map = {
+        'image1/tfrecord':
+        tf.FixedLenFeature([], dtype=tf.string, default_value=''),
+        'image2/tfrecord':
+        tf.FixedLenFeature([], dtype=tf.string, default_value=''),
+    }
+    features = tf.parse_single_example(example_serialized, feature_map)
+    if has_3d:
+        image1, image_size1, label1, center1, fname1, pose1, shape1, gt3d1, has_smpl3d1 = parse_example_proto(
+            features['image1/tfrecord'], has_3d=has_3d)
+        image2, image_size2, label2, center2, fname2, pose2, shape2, gt3d2, has_smpl3d2 = parse_example_proto(
+            features['image2/tfrecord'], has_3d=has_3d)
+        return image1, image_size1, label1, center1, fname1, pose1, shape1, gt3d1, has_smpl3d1, \
+               image2, image_size2, label2, center2, fname2, pose2, shape2, gt3d2, has_smpl3d2
+    else:
+        image1, image_size1, label1, center1, fname1 = parse_example_proto(
+            features['image1/tfrecord'])
+        image2, image_size2, label2, center2, fname2 = parse_example_proto(
+            features['image2/tfrecord'])
+        return image1, image_size1, label1, center1, fname1, \
+               image2, image_size2, label2, center2, fname2
+
+
 def rescale_image(image):
     """
     Rescales image from [0, 1] to [-1, 1]
@@ -130,6 +154,20 @@ def get_all_files(dataset_dir, datasets, split='train'):
     for data_dir in data_dirs:
         all_files += sorted(glob(data_dir))
 
+    return all_files
+
+
+def get_all_files_paired(dataset_dir, datasets, split='train'):
+    data_dirs = [
+        join(dataset_dir, dataset, split, '*.tfrecord')
+	for dataset in datasets
+    ]
+    all_files = []
+    for data_dir in data_dirs:
+	print(data_dir)
+        all_files += sorted(glob(data_dir))
+
+    print(all_files)
     return all_files
 
 

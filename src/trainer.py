@@ -91,10 +91,10 @@ class HMRTrainer(object):
             # self.kp1_loader = data_loader['label1']
             # self.img2_loader = data_loader['image2']
             # self.kp2_loader = data_loader['label2']
-            self.img1_loader = data_loader['image']
-            self.kp1_loader = data_loader['label']
-            self.img2_loader = data_loader['image']
-            self.kp2_loader = data_loader['label']
+            self.img1_loader = data_loader['image1']
+            self.kp1_loader = data_loader['label1']
+            self.img2_loader = data_loader['image2']
+            self.kp2_loader = data_loader['label2']
 
         if self.use_3d_label:
             self.poseshape_loader = data_loader['label3d']
