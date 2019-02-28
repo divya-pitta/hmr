@@ -20,15 +20,14 @@ def generate_tfrecord_paired(filenames, inputfile_dir, outfile_dir, skip_value=2
     with tf.name_scope(None, 'read_data', filenames):
         for fname in filenames:
             filename = join(inputfile_dir, fname + '.tfrecord')
-            print("File being converted to joint tfrecord: ", file_seq_name)
+            print("File being converted to joint tfrecord: ", filename)
             raw_dataset1 = tf.data.TFRecordDataset([filename])
             raw_dataset2 = tf.data.TFRecordDataset([filename])
             raw_dataset2 = raw_dataset2.skip(skip_value)
-            resultant_dataset = tf.data.Dataset.zip((raw_dataset1, raw_dataset2))
-            iterator = resultant_dataset.make_one_shot_iterator()
-            next_pair = iterator.get_next()
-            train_out = join('/Users/jigyayadav/Desktop/UCSDAcads/Quarter5/CSE291D/hmr.nosync/hmr/paired_tfrecords',
-                             'train_%03d.tfrecord')
+            iterator1 = raw_dataset1.make_one_shot_iterator()
+            iterator2 = raw_dataset2.make_one_shot_iterator()
+	    next_pair1 = iterator1.get_next()
+	    next_pair2 = iterator2.get_next()
             train_out = join(outfile_dir, fname + '_%03d.tfrecord')
             fidx = 0
             i = 0
@@ -41,12 +40,13 @@ def generate_tfrecord_paired(filenames, inputfile_dir, outfile_dir, skip_value=2
                         while j < num_shards:
                             if i % 100 == 0:
                                 print('Converting image %d' % (i))
-                            pair_val = sess.run(next_pair)
+                            pair1 = sess.run(next_pair1)
+			    pair2 = sess.run(next_pair2)
                             example = tf.train.Example(features=tf.train.Features(feature={
                                 'image1/tfrecord': bytes_feature(
-                                    tf.compat.as_bytes(pair_val[0])),
+                                    tf.compat.as_bytes(pair1)),
                                 'image2/tfrecord': bytes_feature(
-                                    tf.compat.as_bytes(pair_val[1]))
+                                    tf.compat.as_bytes(pair2))
                             }))
                             writer.write(example.SerializeToString())
                             i += 1
@@ -57,9 +57,9 @@ def generate_tfrecord_paired(filenames, inputfile_dir, outfile_dir, skip_value=2
 
 all_seq_files = []
 test_file_directory = '/endtoendvol/hmr/data/test_tf_datasets/tf_records_human36m_wjoints/test'
-paired_file_directory = '/endtoendvol/hmr/data/test_tf_datasets/tf_records_human36m_wjoints/test/paired_tfrecords'
+paired_file_directory = '/endtoendvol/hmr/data/test_tf_datasets/paired_h36m/train'
 
-all_pairs, actions = evaluate_h36m.get_h36m_seqs(protocol=2)
+all_pairs, actions = evaluate_h36m.get_h36m_seqs(3)
 print("Generated all the action sequences")
 
 for itr, seq_info in enumerate(all_pairs):

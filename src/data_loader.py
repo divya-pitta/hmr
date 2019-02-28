@@ -317,11 +317,6 @@ class DataLoader(object):
                 image1, image_size1, label1, center1, fname1, pose1, shape1, gt3d1, has_smpl3d1,\
                 image2, image_size2, label2, center2, fname2, pose2, shape2, gt3d2, has_smpl3d2, = \
                 data_utils.parse_example_paired_proto(example_serialized, has_3d=has_3d)
-                # Need to send pose bc image can get flipped.
-                image1, label1, pose1, gt3d1 = self.image_preprocessing(
-                    image1, image_size1, label1, center1, pose=pose1, gt3d=gt3d1)
-                image2, label2, pose2, gt3d2 = self.image_preprocessing(
-                    image2, image_size2, label2, center2, pose=pose2, gt3d=gt3d2)
 
                 # Convert pose to rotation.
                 # Do not ignore the global!!
@@ -340,10 +335,6 @@ class DataLoader(object):
                 image1, image_size1, label1, center1, fname1, \
                 image2, image_size2, label2, center2, fname2 = data_utils.parse_example_paired_proto(
                     example_serialized)
-                image1, label1 = self.image_preprocessing(
-                    image1, image_size1, label1, center1)
-                image2, label2 = self.image_preprocessing(
-                    image2, image_size2, label2, center2)
 
             # label should be K x 3
             label1 = tf.transpose(label1)
