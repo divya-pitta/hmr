@@ -365,7 +365,7 @@ class HMRTrainer(object):
                 print("Time taken by interpolate_spline: ",time()-start_time)
                 predj_kp2 = batch_orth_proj_idrot(
                     predJs2, cams2, name='proj2d_stage%d' % i)
-		        # predj_kp2 = pred_kp2
+                # predj_kp2 = pred_kp2
                 # --- Compute losses:
                 loss_kps.append(self.e_loss_weight * (self.keypoint_loss(
                     self.kp1_loader, pred_kp1) + self.keypoint_loss(
@@ -432,8 +432,8 @@ class HMRTrainer(object):
             self.show_imgs1 = tf.gather(self.img1_loader, self.show_these)
             self.show_imgs2 = tf.gather(self.img2_loader, self.show_these)
             self.show_kps1 = tf.gather(self.kp1_loader, self.show_these)
-	    self.show_kps2 = tf.gather(self.kp2_loader, self.show_these)    
-	
+            self.show_kps2 = tf.gather(self.kp2_loader, self.show_these)
+
         # Don't forget to update batchnorm's moving means.
         print('collecting batch norm moving means!!')
         bn_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
@@ -623,11 +623,11 @@ class HMRTrainer(object):
 
         # This is B x H x W x 3
         imgs = result["input_img1"]
-	imgs2 = result["input_img2"]
-        print("Draw results called")
-	plt.imsave("/endtoendvol/hmr/data/test_tf_datasets/paired_h36m/img1.png", imgs[0])
-	plt.imsave("/endtoendvol/hmr/data/test_tf_datasets/paired_h36m/img2.png", imgs2[0])
-	# B x 19 x 3
+        imgs2 = result["input_img2"]
+        # print("Draw results called")
+        # plt.imsave("/endtoendvol/hmr/data/test_tf_datasets/paired_h36m/img1.png", imgs[0])
+        # plt.imsave("/endtoendvol/hmr/data/test_tf_datasets/paired_h36m/img2.png", imgs2[0])
+    # B x 19 x 3
         gt_kps = result["gt_kp1"]
         if self.data_format == 'NCHW':
             imgs = np.transpose(imgs, [0, 2, 3, 1])
@@ -697,9 +697,9 @@ class HMRTrainer(object):
                 if step % self.log_img_step == 0:
                     fetch_dict.update({
                         "input_img1": self.show_imgs1,
-			"input_img2": self.show_imgs2,
+            "input_img2": self.show_imgs2,
                         "gt_kp1": self.show_kps1,
-			"gt_kp2": self.show_kps2,
+            "gt_kp2": self.show_kps2,
                         "e_verts": self.all_verts,
                         "joints": self.all_pred_kps,
                         "cam": self.all_pred_cams,
