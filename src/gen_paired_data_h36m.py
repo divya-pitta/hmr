@@ -57,24 +57,25 @@ def generate_tfrecord_paired(filenames, inputfile_dir, outfile_dir, skip_value=2
                 except tf.errors.OutOfRangeError:
                     break
 
-all_seq_files = []
-test_file_directory = '/hmr/data/test_tf_datasets/tf_records_human36m_wjoints/test'
-paired_file_directory = '/hmr/data/test_tf_datasets/paired_h36m/train'
-
-all_pairs, actions = evaluate_h36m.get_h36m_seqs(3)
-print("Generated all the action sequences")
-
-for itr, seq_info in enumerate(all_pairs):
-    sub_id, action, trial_id, cam_id = seq_info
-    file_seq_name = 'S%d_%s_%d_cam%01d' % (sub_id, action, trial_id, cam_id)
-    print("The sequence name is ", file_seq_name)
-    all_seq_files.append(file_seq_name)
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-root_dir', type=str, required=True)
 
     opt = parser.parse_args()
+
+    all_seq_files = []
+    test_file_directory = '/hmr/data/test_tf_datasets/tf_records_human36m_wjoints/test'
+    paired_file_directory = '/hmr/data/test_tf_datasets/paired_h36m/train'
+
+    all_pairs, actions = evaluate_h36m.get_h36m_seqs(3)
+    print("Generated all the action sequences")
+
+    for itr, seq_info in enumerate(all_pairs):
+        sub_id, action, trial_id, cam_id = seq_info
+        file_seq_name = 'S%d_%s_%d_cam%01d' % (sub_id, action, trial_id, cam_id)
+        print("The sequence name is ", file_seq_name)
+        all_seq_files.append(file_seq_name)
+
     sess = None
     global sess
     if sess is None:
