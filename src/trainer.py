@@ -91,10 +91,10 @@ class HMRTrainer(object):
             # self.kp1_loader = data_loader['label1']
             # self.img2_loader = data_loader['image2']
             # self.kp2_loader = data_loader['label2']
-            self.img1_loader = data_loader['image']
-            self.kp1_loader = data_loader['label']
-            self.img2_loader = data_loader['image']
-            self.kp2_loader = data_loader['label']
+            self.img1_loader = data_loader['image1']
+            self.kp1_loader = data_loader['label1']
+            self.img2_loader = data_loader['image2']
+            self.kp2_loader = data_loader['label2']
 
         if self.use_3d_label:
             self.poseshape_loader = data_loader['label3d']
@@ -429,9 +429,11 @@ class HMRTrainer(object):
             self.show_imgs = tf.gather(self.image_loader, self.show_these)
             self.show_kps = tf.gather(self.kp_loader, self.show_these)
         else:
-            self.show_imgs = tf.gather(self.img1_loader, self.show_these)
-            self.show_kps = tf.gather(self.img2_loader, self.show_these)
-
+            self.show_imgs1 = tf.gather(self.img1_loader, self.show_these)
+            self.show_imgs2 = tf.gather(self.img2_loader, self.show_these)
+            self.show_kps1 = tf.gather(self.kp1_loader, self.show_these)
+	    self.show_kps2 = tf.gather(self.kp2_loader, self.show_these)    
+	
         # Don't forget to update batchnorm's moving means.
         print('collecting batch norm moving means!!')
         bn_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
@@ -620,9 +622,13 @@ class HMRTrainer(object):
         import matplotlib.pyplot as plt
 
         # This is B x H x W x 3
-        imgs = result["input_img"]
-        # B x 19 x 3
-        gt_kps = result["gt_kp"]
+        imgs = result["input_img1"]
+	imgs2 = result["input_img2"]
+        print("Draw results called")
+	plt.imsave("/endtoendvol/hmr/data/test_tf_datasets/paired_h36m/img1.png", imgs[0])
+	plt.imsave("/endtoendvol/hmr/data/test_tf_datasets/paired_h36m/img2.png", imgs2[0])
+	# B x 19 x 3
+        gt_kps = result["gt_kp1"]
         if self.data_format == 'NCHW':
             imgs = np.transpose(imgs, [0, 2, 3, 1])
         # This is B x T x 6890 x 3
@@ -690,8 +696,10 @@ class HMRTrainer(object):
 
                 if step % self.log_img_step == 0:
                     fetch_dict.update({
-                        "input_img": self.show_imgs,
-                        "gt_kp": self.show_kps,
+                        "input_img1": self.show_imgs1,
+			"input_img2": self.show_imgs2,
+                        "gt_kp1": self.show_kps1,
+			"gt_kp2": self.show_kps2,
                         "e_verts": self.all_verts,
                         "joints": self.all_pred_kps,
                         "cam": self.all_pred_cams,

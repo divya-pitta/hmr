@@ -17,6 +17,7 @@ from .util import data_utils
 _3D_DATASETS = ['h36m', 'up', 'mpi_inf_3dhp']
 
 
+
 def num_examples(datasets):
     _NUM_TRAIN = {
         'lsp': 1000,
@@ -63,6 +64,8 @@ class DataLoader(object):
     def load(self):
         if self.use_3d_label:
             image_loader = self.get_loader_w3d()
+        elif self.config.two_pose:
+            image_loader = self.get_loader_paired()
         else:
             image_loader = self.get_loader()
         # The image loader is a dictionary of image batch and 2d keypoint labels
@@ -101,6 +104,41 @@ class DataLoader(object):
             batch_dict[name] = batch
 
         return batch_dict
+
+
+    def get_loader_paired(self):
+        """
+        Outputs:
+          image_batch: batched images im1, im2 as per data_format
+          label_batch: batched keypoint kps1, kps2 labels N x K x 3
+        """
+        files = data_utils.get_all_files_paired(self.dataset_dir, ['paired_h36m'])
+	do_shuffle = True
+        fqueue = tf.train.string_input_producer(
+            files, shuffle=do_shuffle, name="input")
+        image1, label1, image2, label2 = self.read_data_paired(fqueue, has_3d=False)
+        min_after_dequeue = 5000
+        num_threads = 8
+        capacity = min_after_dequeue + 3 * self.batch_size
+
+        pack_these = [image1, label1, image2, label2]
+        pack_name = ['image1', 'label1', 'image2', 'label2']
+
+        all_batched = tf.train.shuffle_batch(
+            pack_these,
+            batch_size=self.batch_size,
+            num_threads=num_threads,
+            capacity=capacity,
+            min_after_dequeue=min_after_dequeue,
+            enqueue_many=False,
+            name='input_batch_train')
+
+        batch_dict = {}
+        for name, batch in zip(pack_name, all_batched):
+            batch_dict[name] = batch
+
+        return batch_dict
+
 
     def get_loader_w3d(self):
         """
@@ -272,6 +310,51 @@ class DataLoader(object):
             else:
                 return image, label
 
+    def read_data_paired(self, filename_queue, has_3d=False):
+        with tf.name_scope(None, 'read_data', [filename_queue]):
+            reader = tf.TFRecordReader()
+            _, example_serialized = reader.read(filename_queue)
+            if has_3d:
+                image1, image_size1, label1, center1, fname1, pose1, shape1, gt3d1, has_smpl3d1,\
+                image2, image_size2, label2, center2, fname2, pose2, shape2, gt3d2, has_smpl3d2, = \
+                data_utils.parse_example_paired_proto(example_serialized, has_3d=has_3d)
+
+		image1, label1, pose1, gt3d1 = self.mage_preprocessing_paired(
+                    image1, image_size1, label1, center1, pose=pose1, gt3d=gt3d1)
+            	image2, label2, pose2, gt3d2 = self.image_preprocessing_paired(
+                    image2, image_size2, label2, center2, pose=pose2, gt3d=gt3d2)
+                # Convert pose to rotation.
+                # Do not ignore the global!!
+                rotations1 = batch_rodrigues(tf.reshape(pose1, [-1, 3]))
+                rotations2 = batch_rodrigues(tf.reshape(pose2, [-1, 3]))
+                gt3d_flat1 = tf.reshape(gt3d1, [-1])
+                gt3d_flat2 = tf.reshape(gt3d2, [-1])
+                # Label 3d is:
+                #   [rotations, shape-beta, 3Djoints]
+                #   [216=24*3*3, 10, 42=14*3]
+                label3d1 = tf.concat(
+                    [tf.reshape(rotations1, [-1]), shape1, gt3d_flat1], 0)
+                label3d2 = tf.concat(
+                    [tf.reshape(rotations2, [-1]), shape2, gt3d_flat2], 0)
+            else:
+                image1, image_size1, label1, center1, fname1, \
+                image2, image_size2, label2, center2, fname2 = data_utils.parse_example_paired_proto(
+                    example_serialized)
+		
+		image1, label1 = self.image_preprocessing_paired(
+                    image1, image_size1, label1, center1)
+                image2, label2 = self.image_preprocessing_paired(
+                    image2, image_size2, label2, center2)
+		
+            # label should be K x 3
+            label1 = tf.transpose(label1)
+            label2 = tf.transpose(label2)
+
+            if has_3d:
+                return image1, label1, label3d1, has_smpl3d1, image2, label2, label3d2, has_smpl3d2
+            else:
+                return image1, label1, image2, label2
+
     def image_preprocessing(self,
                             image,
                             image_size,
@@ -331,5 +414,59 @@ class DataLoader(object):
             crop = self.image_normalizing_fn(crop)
             if pose is not None:
                 return crop, final_label, new_pose, new_gt3d
+            else:
+                return crop, final_label
+
+
+    def image_preprocessing_paired(self,
+                                   image,
+                                   image_size,
+                                   label,
+                                   center,
+                                   pose=None,
+                                   gt3d=None):
+        margin = tf.to_int32(self.output_size / 2)
+        with tf.name_scope(None, 'image_preprocessing',
+                           [image, image_size, label, center]):
+            visibility = label[2, :]
+            keypoints = label[:2, :]
+            # No random jitter
+            # Randomly scale but specify the scale to be only 1
+            image, keypoints, center = data_utils.jitter_scale(
+                image, image_size, keypoints, center, [1, 1])
+
+            # Do we want to pad the image?-  Removed the trans_max here
+            margin_safe = margin + 50
+            image_pad = data_utils.pad_image_edge(image, margin_safe)
+            center_pad = center + margin_safe
+            keypoints_pad = keypoints + tf.to_float(margin_safe)
+
+            start_pt = center_pad - margin
+
+            # Crop image pad.
+            start_pt = tf.squeeze(start_pt)
+            bbox_begin = tf.stack([start_pt[1], start_pt[0], 0])
+            bbox_size = tf.stack([self.output_size, self.output_size, 3])
+
+            crop = tf.slice(image_pad, bbox_begin, bbox_size)
+            x_crop = keypoints_pad[0, :] - tf.to_float(start_pt[0])
+            y_crop = keypoints_pad[1, :] - tf.to_float(start_pt[1])
+
+            crop_kp = tf.stack([x_crop, y_crop, visibility])
+
+            # Remove random flip
+            # Normalize kp output to [-1, 1]
+            final_vis = tf.cast(crop_kp[2, :] > 0, tf.float32)
+            final_label = tf.stack([
+                2.0 * (crop_kp[0, :] / self.output_size) - 1.0,
+                2.0 * (crop_kp[1, :] / self.output_size) - 1.0, final_vis
+            ])
+            # Preserving non_vis to be 0.
+            final_label = final_vis * final_label
+
+            # rescale image from [0, 1] to [-1, 1]
+            crop = self.image_normalizing_fn(crop)
+            if pose is not None:
+                return crop, final_label, pose, gt3d
             else:
                 return crop, final_label
