@@ -319,6 +319,10 @@ class DataLoader(object):
                 image2, image_size2, label2, center2, fname2, pose2, shape2, gt3d2, has_smpl3d2, = \
                 data_utils.parse_example_paired_proto(example_serialized, has_3d=has_3d)
 
+		image1, label1, pose1, gt3d1 = self.mage_preprocessing_paired(
+                    image1, image_size1, label1, center1, pose=pose1, gt3d=gt3d1)
+            	image2, label2, pose2, gt3d2 = self.image_preprocessing_paired(
+                    image2, image_size2, label2, center2, pose=pose2, gt3d=gt3d2)
                 # Convert pose to rotation.
                 # Do not ignore the global!!
                 rotations1 = batch_rodrigues(tf.reshape(pose1, [-1, 3]))
@@ -336,7 +340,12 @@ class DataLoader(object):
                 image1, image_size1, label1, center1, fname1, \
                 image2, image_size2, label2, center2, fname2 = data_utils.parse_example_paired_proto(
                     example_serialized)
-
+		
+		image1, label1 = self.image_preprocessing_paired(
+                    image1, image_size1, label1, center1)
+                image2, label2 = self.image_preprocessing_paired(
+                    image2, image_size2, label2, center2)
+		
             # label should be K x 3
             label1 = tf.transpose(label1)
             label2 = tf.transpose(label2)
@@ -405,5 +414,59 @@ class DataLoader(object):
             crop = self.image_normalizing_fn(crop)
             if pose is not None:
                 return crop, final_label, new_pose, new_gt3d
+            else:
+                return crop, final_label
+
+
+    def image_preprocessing_paired(self,
+                                   image,
+                                   image_size,
+                                   label,
+                                   center,
+                                   pose=None,
+                                   gt3d=None):
+        margin = tf.to_int32(self.output_size / 2)
+        with tf.name_scope(None, 'image_preprocessing',
+                           [image, image_size, label, center]):
+            visibility = label[2, :]
+            keypoints = label[:2, :]
+            # No random jitter
+            # Randomly scale but specify the scale to be only 1
+            image, keypoints, center = data_utils.jitter_scale(
+                image, image_size, keypoints, center, [1, 1])
+
+            # Do we want to pad the image?-  Removed the trans_max here
+            margin_safe = margin + 50
+            image_pad = data_utils.pad_image_edge(image, margin_safe)
+            center_pad = center + margin_safe
+            keypoints_pad = keypoints + tf.to_float(margin_safe)
+
+            start_pt = center_pad - margin
+
+            # Crop image pad.
+            start_pt = tf.squeeze(start_pt)
+            bbox_begin = tf.stack([start_pt[1], start_pt[0], 0])
+            bbox_size = tf.stack([self.output_size, self.output_size, 3])
+
+            crop = tf.slice(image_pad, bbox_begin, bbox_size)
+            x_crop = keypoints_pad[0, :] - tf.to_float(start_pt[0])
+            y_crop = keypoints_pad[1, :] - tf.to_float(start_pt[1])
+
+            crop_kp = tf.stack([x_crop, y_crop, visibility])
+
+            # Remove random flip
+            # Normalize kp output to [-1, 1]
+            final_vis = tf.cast(crop_kp[2, :] > 0, tf.float32)
+            final_label = tf.stack([
+                2.0 * (crop_kp[0, :] / self.output_size) - 1.0,
+                2.0 * (crop_kp[1, :] / self.output_size) - 1.0, final_vis
+            ])
+            # Preserving non_vis to be 0.
+            final_label = final_vis * final_label
+
+            # rescale image from [0, 1] to [-1, 1]
+            crop = self.image_normalizing_fn(crop)
+            if pose is not None:
+                return crop, final_label, pose, gt3d
             else:
                 return crop, final_label
