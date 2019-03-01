@@ -8,7 +8,7 @@ from glob import glob
 import tensorflow as tf
 import sys
 import argparse
-
+import os
 from .datasets.common import read_images_from_tfrecords
 from .datasets.common import bytes_feature
 from .util import data_utils
@@ -64,9 +64,10 @@ def main():
     opt = parser.parse_args()
 
     all_seq_files = []
-    test_file_directory = '/hmr/data/test_tf_datasets/tf_records_human36m_wjoints/test'
-    paired_file_directory = '/hmr/data/test_tf_datasets/paired_h36m/train'
-
+    test_file_directory = opt.root_dir+'/hmr/data/test_tf_datasets/tf_records_human36m_wjoints/test'
+    paired_file_directory = opt.root_dir+'/hmr/data/test_tf_datasets/paired_h36m/train'
+    if not os.path.exists(paired_file_directory):
+    	os.makedirs(paired_file_directory)
     all_pairs, actions = evaluate_h36m.get_h36m_seqs(3)
     print("Generated all the action sequences")
 
@@ -80,7 +81,7 @@ def main():
     global sess
     if sess is None:
         sess = tf.Session()
-    generate_tfrecord_paired(all_seq_files, opt.root_dir+test_file_directory, opt.root_dir+paired_file_directory)
+    generate_tfrecord_paired(all_seq_files, test_file_directory, paired_file_directory)
 
 if __name__ == '__main__':
     main()
