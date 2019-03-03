@@ -90,8 +90,8 @@ class HMRTrainer(object):
             self.image_loader = data_loader['image']
             self.kp_loader = data_loader['label']
             self.batch_queue_loader.extend(
-                self.image_loader,
-                self.kp_loader
+                [self.image_loader,
+                self.kp_loader]
             )
         else:
             self.img1_loader = data_loader['image1']
@@ -99,10 +99,10 @@ class HMRTrainer(object):
             self.img2_loader = data_loader['image2']
             self.kp2_loader = data_loader['label2']
             self.batch_queue_loader.extend(
-                self.img1_loader,
+                [self.img1_loader,
                 self.kp1_loader,
                 self.img2_loader,
-                self.kp2_loader
+                self.kp2_loader]
             )
 
         if self.use_3d_label:
@@ -112,16 +112,16 @@ class HMRTrainer(object):
             self.has_gt3d_joints = data_loader['has3d'][:, 0]
             self.has_gt3d_smpl = data_loader['has3d'][:, 1]
             self.batch_queue_loader.extend(
-                self.poseshape_loader,
+                [self.poseshape_loader,
                 self.has_gt3d_joints,
-                self.has_gt3d_smpl,
+                self.has_gt3d_smpl]
             )
 
         self.pose_loader = mocap_loader[0]
         self.shape_loader = mocap_loader[1]
         self.batch_queue_loader.extend(
-            self.pose_loader,
-            self.shape_loader,
+            [self.pose_loader,
+            self.shape_loader]
         )
 
         self.batch_queue = tf.contrib.slim.prefetch_queue.prefetch_queue(
