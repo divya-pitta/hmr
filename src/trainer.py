@@ -166,6 +166,7 @@ class HMRTrainer(object):
         if self.num_gpus==1:
             self.build_model()
         else:
+            print("Setting up multi gpu")
             self.setup_multigpu()
 
         # Logging
@@ -1020,6 +1021,7 @@ class HMRTrainer(object):
 
 
     def train_multigpu(self):
+        print("Training multi gpu")
         # For rendering!
         self.renderer = vis_util.SMPLRenderer(
             img_size=self.img_size,

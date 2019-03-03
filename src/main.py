@@ -25,8 +25,10 @@ def main(config):
     #pdb.set_trace()
     trainer = HMRTrainer(config, image_loader, smpl_loader)
     save_config(config)
-    trainer.train()
-
+    if config.num_gpus==1:
+        trainer.train()
+    else:
+        trainer.train_multigpu()
 
 if __name__ == '__main__':
     config = get_config()
