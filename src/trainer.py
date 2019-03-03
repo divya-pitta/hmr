@@ -163,7 +163,10 @@ class HMRTrainer(object):
         # Instantiate SMPL
         self.smpl = SMPL(self.smpl_model_path)
         self.E_var = []
-        self.build_model()
+        if self.num_gpus==1:
+            self.build_model()
+        else:
+            self.setup_multigpu()
 
         # Logging
         init_fn = None
@@ -534,7 +537,7 @@ class HMRTrainer(object):
                         image_loader, kp_loader, pose_loader, shape_loader = self.batch_queue.dequeu()
 
                         # run the model and get the loss
-                        e_loss, d_loss = self.build_multigpu_model(
+                        self.e_loss, self.d_loss = self.build_multigpu_model(
                             image_loader,
                             kp_loader,
                             pose_loader,
@@ -562,9 +565,13 @@ class HMRTrainer(object):
             egrads,
             global_step=self.global_step,
         )
+        apply_gradient_opd = self.optimizer(self.d_lr).apply_gradients(
+            dgrads,
+            global_step=self.global_step
+        )
 
-        self.train_op = tf.group(apply_gradient_op)
-
+        self.train_op_e = tf.group(apply_gradient_op)
+        self.train_op_d = tf.group(apply_gradient_opd)
 
 
     def build_model(self):
@@ -1010,6 +1017,91 @@ class HMRTrainer(object):
         img_summary = tf.Summary(value=img_summaries)
         self.summary_writer.add_summary(
             img_summary, global_step=result['step'])
+
+
+    def train_multigpu(self):
+        # For rendering!
+        self.renderer = vis_util.SMPLRenderer(
+            img_size=self.img_size,
+            face_path=self.config.smpl_face_path)
+
+        step = 0
+
+        with self.sv.managed_session(config=self.sess_config) as sess:
+            tf.train.start_queue_runners(sess=sess)
+            while not self.sv.should_stop():
+                fetch_dict = {
+                    "summary": self.summary_op_always,
+                    "step": self.global_step,
+                    "e_loss": self.e_loss,
+                    # The meat
+                    "e_opt": self.e_opt,
+                    "loss_kp": self.e_loss_kp
+                }
+                if not self.encoder_only:
+                    fetch_dict.update({
+                        # For D:
+                        "d_opt": self.d_opt,
+                        "d_loss": self.d_loss,
+                        "loss_disc": self.e_loss_disc,
+                    })
+                if self.use_3d_label:
+                    fetch_dict.update({
+                        "loss_3d_params": self.e_loss_3d,
+                        "loss_3d_joints": self.e_loss_3d_joints
+                    })
+
+                if step % self.log_img_step == 0:
+                    fetch_dict.update({
+                        "input_img1": self.show_imgs,
+            "input_img2": self.show_imgs,
+                        "gt_kp1": self.show_kps,
+            "gt_kp2": self.show_kps,
+                        "e_verts": self.all_verts,
+                        "joints": self.all_pred_kps,
+                        "cam": self.all_pred_cams,
+                    })
+                    if not self.encoder_only:
+                        fetch_dict.update({
+                            "summary_occasional":
+                            self.summary_op_occ
+                        })
+
+                t0 = time()
+                result = sess.run(fetch_dict)
+                # result = sess.run([self.train_op_d, self.train_op_e, self.e_loss, self.d_loss])
+                t1 = time()
+
+                self.summary_writer.add_summary(
+                    result['summary'], global_step=result['step'])
+
+                e_loss = result['e_loss']
+                step = result['step']
+
+                epoch = float(step) / self.num_itr_per_epoch
+                if self.encoder_only:
+                    print("itr %d/(epoch %.1f): time %g, Enc_loss: %.4f" %
+                          (step, epoch, t1 - t0, e_loss))
+                else:
+                    d_loss = result['d_loss']
+                    print(
+                        "itr %d/(epoch %.1f): time %g, Enc_loss: %.4f, Disc_loss: %.4f"
+                        % (step, epoch, t1 - t0, e_loss, d_loss))
+
+                if step % self.log_img_step == 0:
+                    if not self.encoder_only:
+                        self.summary_writer.add_summary(
+                            result['summary_occasional'],
+                            global_step=result['step'])
+                    self.draw_results(result)
+
+                self.summary_writer.flush()
+                if epoch > self.max_epoch:
+                    self.sv.request_stop()
+
+                step += 1
+
+        print('Finish training on %s' % self.model_dir)
 
     def train(self):
         # For rendering!
