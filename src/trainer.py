@@ -31,6 +31,7 @@ import deepdish as dd
 
 # For drawing
 from .util import renderer as vis_util
+import pdb
 
 
 class HMRTrainer(object):
@@ -259,7 +260,7 @@ class HMRTrainer(object):
         :return: List of pairs of (gradient, variable) where the gradient has been averaged
                 across all towers.
         """
-
+	#pdb.set_trace()
         average_grads = []
         for grad_and_vars in zip(*tower_grads):
             # Note that each grad_and_vars looks like the following:
@@ -267,10 +268,12 @@ class HMRTrainer(object):
             grads = []
             for g, _ in grad_and_vars:
                 # Add 0 dimension to the gradients to represent the tower.
-                expanded_g = tf.expand_dims(g, 0)
-
-                # Append on a 'tower' dimension which we will average over below.
-                grads.append(expanded_g)
+                print(g)
+		if g is not None:
+		    expanded_g = tf.expand_dims(g, 0)
+	
+                    # Append on a 'tower' dimension which we will average over below.
+                    grads.append(expanded_g)
 
             # Average over the 'tower' dimension.
             grad = tf.concat(axis=0, values=grads)
@@ -468,28 +471,28 @@ class HMRTrainer(object):
             self.setup_discriminator(fake_rotations, fake_shapes)
 
         # Gather losses.
-        with tf.name_scope("gather_e_loss"):
+        #with tf.name_scope("gather_e_loss"):
             # Just the last loss.
-            self.e_loss_kp = loss_kps[-1]
+    	self.e_loss_kp = loss_kps[-1]
 
-            if self.encoder_only:
-                self.e_loss = self.e_loss_kp
-            else:
-                self.e_loss = self.d_loss_weight * self.e_loss_disc + self.e_loss_kp
+    	if self.encoder_only:	
+	    self.e_loss = self.e_loss_kp
+    	else:
+	    self.e_loss = self.d_loss_weight * self.e_loss_disc + self.e_loss_kp
 
-            if self.use_3d_label:
-                self.e_loss_3d = loss_3d_params[-1]
-                self.e_loss_3d_joints = loss_3d_joints[-1]
-                self.e_loss += (self.e_loss_3d + self.e_loss_3d_joints)
+    	if self.use_3d_label:
+	    self.e_loss_3d = loss_3d_params[-1]
+	    self.e_loss_3d_joints = loss_3d_joints[-1]
+	    self.e_loss += (self.e_loss_3d + self.e_loss_3d_joints)
 
-            if self.two_pose:
-                self.shape_loss = tf.losses.absolute_difference(shapes1, shapes2)
-                self.e_loss += self.shape_loss
+    	if self.two_pose:
+	    self.shape_loss = tf.losses.absolute_difference(shapes1, shapes2)
+	    self.e_loss += self.shape_loss
 
         if not self.encoder_only:
-            with tf.name_scope("gather_d_loss"):
-                self.d_loss = self.d_loss_weight * (
-                        self.d_loss_real + self.d_loss_fake)
+            #with tf.name_scope("gather_d_loss"):
+	    self.d_loss = self.d_loss_weight * (
+		self.d_loss_real + self.d_loss_fake)
 
         # For visualizations, only save selected few into:
         # B x T x ...
@@ -535,10 +538,11 @@ class HMRTrainer(object):
             for i in range(self.num_gpus):
                 with tf.device('/gpu:%d' %i):
                     with tf.name_scope('tower_%d'%i) as scope:
-                        image_loader, kp_loader, pose_loader, shape_loader = self.batch_queue.dequeu()
+                        #pdb.set_trace()
+			image_loader, kp_loader, _, _, _, pose_loader, shape_loader = self.batch_queue.dequeue()
 
                         # run the model and get the loss
-                        self.e_loss, self.d_loss = self.build_multigpu_model(
+                        e_loss, d_loss = self.build_multigpu_model(
                             image_loader,
                             kp_loader,
                             pose_loader,
@@ -561,7 +565,7 @@ class HMRTrainer(object):
 
         egrads = self.average_gradients(self.tower_egrads)
         dgrads = self.average_gradients(self.tower_dgrads)
-
+	#pdb.set_trace()
         apply_gradient_op = self.optimizer(self.e_lr).apply_gradients(
             egrads,
             global_step=self.global_step,
@@ -1037,13 +1041,13 @@ class HMRTrainer(object):
                     "step": self.global_step,
                     "e_loss": self.e_loss,
                     # The meat
-                    "e_opt": self.e_opt,
+                    #"e_opt": self.e_opt,
                     "loss_kp": self.e_loss_kp
                 }
                 if not self.encoder_only:
                     fetch_dict.update({
                         # For D:
-                        "d_opt": self.d_opt,
+                        #"d_opt": self.d_opt,
                         "d_loss": self.d_loss,
                         "loss_disc": self.e_loss_disc,
                     })
