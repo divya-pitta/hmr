@@ -1074,25 +1074,26 @@ class HMRTrainer(object):
                         })
 
                 t0 = time()
-                result = sess.run(fetch_dict)
-                # result = sess.run([self.train_op_d, self.train_op_e, self.e_loss, self.d_loss])
+                # result = sess.run(fetch_dict)
+                result = sess.run([self.train_op_d, self.train_op_e, self.e_loss, self.d_loss])
+                print(result)
                 t1 = time()
 
-                self.summary_writer.add_summary(
-                    result['summary'], global_step=result['step'])
-
-                e_loss = result['e_loss']
-                step = result['step']
-
-                epoch = float(step) / self.num_itr_per_epoch
-                if self.encoder_only:
-                    print("itr %d/(epoch %.1f): time %g, Enc_loss: %.4f" %
-                          (step, epoch, t1 - t0, e_loss))
-                else:
-                    d_loss = result['d_loss']
-                    print(
-                        "itr %d/(epoch %.1f): time %g, Enc_loss: %.4f, Disc_loss: %.4f"
-                        % (step, epoch, t1 - t0, e_loss, d_loss))
+                # self.summary_writer.add_summary(
+                #     result['summary'], global_step=result['step'])
+                #
+                # e_loss = result['e_loss']
+                # step = result['step']
+                #
+                # epoch = float(step) / self.num_itr_per_epoch
+                # if self.encoder_only:
+                #     print("itr %d/(epoch %.1f): time %g, Enc_loss: %.4f" %
+                #           (step, epoch, t1 - t0, e_loss))
+                # else:
+                #     d_loss = result['d_loss']
+                #     print(
+                #         "itr %d/(epoch %.1f): time %g, Enc_loss: %.4f, Disc_loss: %.4f"
+                #         % (step, epoch, t1 - t0, e_loss, d_loss))
 
                 # if step % self.log_img_step == 0:
                 #     if not self.encoder_only:
@@ -1102,8 +1103,8 @@ class HMRTrainer(object):
                 #     self.draw_results(result)
 
                 self.summary_writer.flush()
-                if epoch > self.max_epoch:
-                    self.sv.request_stop()
+                # if epoch > self.max_epoch:
+                #     self.sv.request_stop()
 
                 step += 1
 
