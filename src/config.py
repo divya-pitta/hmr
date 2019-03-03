@@ -99,6 +99,7 @@ flags.DEFINE_integer('trans_max', 20, 'Value to jitter translation')
 flags.DEFINE_float('scale_max', 1.23, 'Max value of scale jitter')
 flags.DEFINE_float('scale_min', 0.8, 'Min value of scale jitter')
 
+flags.DEFINE_integer('num_gpus', 1, 'Number of gpus to use')
 
 def get_config():
     config = flags.FLAGS
