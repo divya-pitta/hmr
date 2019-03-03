@@ -1094,12 +1094,12 @@ class HMRTrainer(object):
                         "itr %d/(epoch %.1f): time %g, Enc_loss: %.4f, Disc_loss: %.4f"
                         % (step, epoch, t1 - t0, e_loss, d_loss))
 
-                if step % self.log_img_step == 0:
-                    if not self.encoder_only:
-                        self.summary_writer.add_summary(
-                            result['summary_occasional'],
-                            global_step=result['step'])
-                    self.draw_results(result)
+                # if step % self.log_img_step == 0:
+                #     if not self.encoder_only:
+                #         self.summary_writer.add_summary(
+                #             result['summary_occasional'],
+                #             global_step=result['step'])
+                #     self.draw_results(result)
 
                 self.summary_writer.flush()
                 if epoch > self.max_epoch:
