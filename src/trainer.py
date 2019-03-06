@@ -1068,7 +1068,9 @@ class HMRTrainer(object):
                         "cam": self.all_pred_cams,
                     })
                     if not self.encoder_only:
-                        fetch_dict.update({
+			print("Updating fetch_dict")
+                        print(step)
+			fetch_dict.update({
                             "summary_occasional":
                             self.summary_op_occ
                         })
@@ -1099,6 +1101,8 @@ class HMRTrainer(object):
 
                 if step % self.log_img_step == 0:
                     if not self.encoder_only:
+			print(result)
+			print(step)
                         self.summary_writer.add_summary(
                             result['summary_occasional'],
                             global_step=result['step'])
