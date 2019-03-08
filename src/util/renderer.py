@@ -17,6 +17,7 @@ colors = {
     # colorbline/print/copy safe:
     'light_blue': [0.65098039, 0.74117647, 0.85882353],
     'light_pink': [.9, .7, .7],  # This is used to do no-3d
+    'white': [1, 1, 1], # This is used to create the silhouette
 }
 
 
@@ -38,7 +39,8 @@ class SMPLRenderer(object):
                  far=None,
                  near=None,
                  color_id=0,
-                 img_size=None):
+                 img_size=None,
+                 light_color=None):
         """
         cam is 3D [f, px, py]
         """
@@ -76,7 +78,9 @@ class SMPLRenderer(object):
             img=img,
             far=far,
             near=near,
-            color_id=color_id)
+            color_id=color_id,
+            light_color=light_color,
+        )
 
         return (imtmp * 255).astype('uint8')
 
@@ -144,37 +148,67 @@ def simple_renderer(rn,
                     verts,
                     faces,
                     yrot=np.radians(120),
-                    color=colors['light_pink']):
+                    color=colors['light_pink'],
+                    light_color=None):
     # Rendered model color
     rn.set(v=verts, f=faces, vc=color, bgcolor=np.ones(3))
     albedo = rn.vc
 
-    # Construct Back Light (on back right corner)
-    rn.vc = LambertianPointLight(
-        f=rn.f,
-        v=rn.v,
-        num_verts=len(rn.v),
-        light_pos=_rotateY(np.array([-200, -100, -100]), yrot),
-        vc=albedo,
-        light_color=np.array([1, 1, 1]))
+    if light_color is None:
+        # Construct Back Light (on back right corner)
+        rn.vc = LambertianPointLight(
+            f=rn.f,
+            v=rn.v,
+            num_verts=len(rn.v),
+            light_pos=_rotateY(np.array([-200, -100, -100]), yrot),
+            vc=albedo,
+            light_color=np.array([1, 1, 1]))
 
-    # Construct Left Light
-    rn.vc += LambertianPointLight(
-        f=rn.f,
-        v=rn.v,
-        num_verts=len(rn.v),
-        light_pos=_rotateY(np.array([800, 10, 300]), yrot),
-        vc=albedo,
-        light_color=np.array([1, 1, 1]))
+        # Construct Left Light
+        rn.vc += LambertianPointLight(
+            f=rn.f,
+            v=rn.v,
+            num_verts=len(rn.v),
+            light_pos=_rotateY(np.array([800, 10, 300]), yrot),
+            vc=albedo,
+            light_color=np.array([1, 1, 1]))
 
-    # Construct Right Light
-    rn.vc += LambertianPointLight(
-        f=rn.f,
-        v=rn.v,
-        num_verts=len(rn.v),
-        light_pos=_rotateY(np.array([-500, 500, 1000]), yrot),
-        vc=albedo,
-        light_color=np.array([.7, .7, .7]))
+        # Construct Right Light
+        rn.vc += LambertianPointLight(
+            f=rn.f,
+            v=rn.v,
+            num_verts=len(rn.v),
+            light_pos=_rotateY(np.array([-500, 500, 1000]), yrot),
+            vc=albedo,
+            light_color=np.array([.7, .7, .7]))
+
+    else:
+        # Construct Back Light (on back right corner)
+        rn.vc = LambertianPointLight(
+            f=rn.f,
+            v=rn.v,
+            num_verts=len(rn.v),
+            light_pos=_rotateY(np.array([-200, -100, -100]), yrot),
+            vc=albedo,
+            light_color=np.array([0, 0, 0]))
+
+        # Construct Left Light
+        rn.vc += LambertianPointLight(
+            f=rn.f,
+            v=rn.v,
+            num_verts=len(rn.v),
+            light_pos=_rotateY(np.array([800, 10, 300]), yrot),
+            vc=albedo,
+            light_color=np.array([0, 0, 0]))
+
+        # Construct Right Light
+        rn.vc += LambertianPointLight(
+            f=rn.f,
+            v=rn.v,
+            num_verts=len(rn.v),
+            light_pos=_rotateY(np.array([-500, 500, 1000]), yrot),
+            vc=albedo,
+            light_color=np.array([0, 0, 0]))
 
     return rn.r
 
@@ -208,7 +242,8 @@ def render_model(verts,
                  far=25,
                  img=None,
                  do_alpha=False,
-                 color_id=None):
+                 color_id=None,
+                 light_color=None):
     rn = _create_renderer(
         w=w, h=h, near=near, far=far, rt=cam.rt, t=cam.t, f=cam.f, c=cam.c)
 
@@ -222,7 +257,7 @@ def render_model(verts,
         color_list = colors.values()
         color = color_list[color_id % len(color_list)]
 
-    imtmp = simple_renderer(rn, verts, faces, color=color)
+    imtmp = simple_renderer(rn, verts, faces, color=color, light_color=light_color)
 
     # If white bg, make transparent.
     if img is None and do_alpha:
@@ -305,6 +340,7 @@ def draw_skeleton(input_image, joints, draw_edges=True, vis=None, radius=None):
         'blue': np.array([69, 117, 180]),  # R upper arm
         'gray': np.array([130, 130, 130]),  #
         'white': np.array([255, 255, 255]),  #
+        'black': np.array([0, 0, 0]),
     }
 
     image = input_image.copy()

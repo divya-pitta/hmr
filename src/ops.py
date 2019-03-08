@@ -7,7 +7,27 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
+import numpy as np
+from demo import get_silhouette
 
+# Assuming the silhouette is of the exact same size as the image in input!!!!! Else this will fail.
+def silhouette_l1_loss(self, sil_gt, joints, vertices, cams):
+    #TODO: Make this faster using batch operations!!!
+    sils = []
+    for index in sil_gt.shape[0]:
+        inv_sil = get_silhouette(
+            sil_gt[index],
+            joints[index],
+            vertices[index],
+            cams[index]
+        )
+        # Inverting 0s and 1s
+        sil = 1 / (2e-5 + inv_sil)
+        #Normalizing to between 0 and 1
+        sil = (sil - np.min(sil))/(np.max(sil) - np.min(sil))
+        sils.append(sil)
+    res = tf.losses.absolute_difference(sil_gt, sils)
+    return res
 
 def keypoint_l1_loss(kp_gt, kp_pred, scale=1., name=None):
     """

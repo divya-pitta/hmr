@@ -39,7 +39,7 @@ flags.DEFINE_string('img_path', 'data/im1963.jpg', 'Image to run')
 flags.DEFINE_string(
     'json_path', None,
     'If specified, uses the openpose output to crop the image.')
-
+config = flags.FLAGS
 
 def visualize(img, proc_param, joints, verts, cam):
     """
@@ -93,8 +93,11 @@ def visualize(img, proc_param, joints, verts, cam):
     # ipdb.set_trace()
 
 
-def preprocess_image(img_path, json_path=None):
-    img = io.imread(img_path)
+def preprocess_image(img_path, json_path=None, ignore_read=False):
+    if not ignore_read:
+        img = io.imread(img_path)
+    else:
+        img = img_path
     if img.shape[2] == 4:
         img = img[:, :, :3]
 
@@ -117,6 +120,24 @@ def preprocess_image(img_path, json_path=None):
     crop = 2 * ((crop / 255.) - 0.5)
 
     return crop, proc_param, img
+
+def get_silhouette(sil, joints, verts, cam):
+    _, proc_param, _ = preprocess_image(sil, ignore_read=True)
+
+    cam_for_render, vert_shifted, joints_orig = vis_util.get_original(
+        proc_param, verts, cam, joints)
+
+    renderer = vis_util.SMPLRenderer()
+
+    # This returns the image with black image silhouette and white background in 255 format
+    rend_img = renderer(
+        vert_shifted,
+        cam=cam_for_render,
+        img_size=proc_param['img_size'][:2],
+        light_color=np.array([0, 0, 0])
+    )
+
+    return rend_img
 
 
 def main(img_path, json_path=None):

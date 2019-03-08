@@ -10,7 +10,7 @@ from __future__ import print_function
 
 from .data_loader import num_examples
 
-from .ops import keypoint_l1_loss, compute_3d_loss, align_by_pelvis
+from .ops import keypoint_l1_loss, compute_3d_loss, align_by_pelvis, silhouette_l1_loss
 from .models import Discriminator_separable_rotations, get_encoder_fn_separate
 
 from .tf_smpl.batch_lbs import batch_rodrigues
@@ -69,6 +69,7 @@ class HMRTrainer(object):
 
         # Poses used for training
         self.two_pose = config.two_pose
+        self.use_sil = config.use_sil
 
         # Data
         num_images = num_examples(config.datasets)
@@ -95,6 +96,12 @@ class HMRTrainer(object):
             self.kp1_loader = data_loader['label1']
             self.img2_loader = data_loader['image2']
             self.kp2_loader = data_loader['label2']
+            if self.use_sil:
+                #TODO: Change this to point to silhouette loader
+                # self.sil1_loader = data_loader['sil1']
+                # self.sil2_loader = data_loader['sil2']
+                self.sil1_loader = data_loader['image1']
+                self.sil2_loader = data_loader['image2']
 
         if self.use_3d_label:
             self.poseshape_loader = data_loader['label3d']
@@ -120,6 +127,7 @@ class HMRTrainer(object):
         # Model spec
         self.model_type = config.model_type
         self.keypoint_loss = keypoint_l1_loss
+        self.silhouette_loss = silhouette_l1_loss
         #TODO: Add shape loss
 
         # Optimizer, learning rate
@@ -219,6 +227,7 @@ class HMRTrainer(object):
         init_mean = tf.tile(self.mean_var, [self.batch_size, 1])
         return init_mean
 
+
     def build_model(self):
         img_enc_fn, threed_enc_fn = get_encoder_fn_separate(self.model_type)
         # Extract image features.
@@ -238,6 +247,7 @@ class HMRTrainer(object):
             #self.E_var.extend(self.E2_var)
 
         loss_kps = []
+        loss_sil = []
         if self.use_3d_label:
             loss_3d_joints, loss_3d_params = [], []
         # For discriminator
@@ -373,6 +383,10 @@ class HMRTrainer(object):
                     self.kp2_loader, predj_kp2)
                 ))
 
+                if self.use_sil:
+                    loss_sil.append(self.silhouette_loss(self.sil1_loader, Js1, verts1, cams1) +
+                                    self.silhouette_loss(self.sil2_loader, Js2, verts2, cams2))
+
                 # pred_Rs = tf.reshape(pred_Rs, [-1, 24, 9])
                 # if self.use_3d_label:
                 #     loss_poseshape, loss_joints = self.get_3d_loss(
@@ -414,6 +428,9 @@ class HMRTrainer(object):
             if self.two_pose:
                 self.shape_loss = tf.losses.absolute_difference(shapes1, shapes2)
                 self.e_loss += self.shape_loss
+                if self.use_sil:
+                    self.e_sil_loss = loss_sil[-1]
+                    self.e_loss += self.e_sil_loss
 
         if not self.encoder_only:
             with tf.name_scope("gather_d_loss"):

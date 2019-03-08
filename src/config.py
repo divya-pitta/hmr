@@ -82,6 +82,11 @@ flags.DEFINE_boolean(
     'Uses two poses to train the network'
 )
 
+flags.DEFINE_boolean(
+    'use_sil', False,
+    'Use the silhouette loss for better shape prediction',
+)
+
 # Hyper parameters:
 flags.DEFINE_float('e_lr', 0.001, 'Encoder learning rate')
 flags.DEFINE_float('d_lr', 0.001, 'Adversarial prior learning rate')
