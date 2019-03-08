@@ -11,10 +11,10 @@ import numpy as np
 from demo import get_silhouette
 
 # Assuming the silhouette is of the exact same size as the image in input!!!!! Else this will fail.
-def silhouette_l1_loss(self, sil_gt, joints, vertices, cams):
+def silhouette_l1_loss(sil_gt, joints, vertices, cams):
     #TODO: Make this faster using batch operations!!!
     sils = []
-    for index in sil_gt.shape[0]:
+    for index in range(sil_gt.shape[0]):
         inv_sil = get_silhouette(
             sil_gt[index],
             joints[index],
