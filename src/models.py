@@ -19,6 +19,7 @@ import tensorflow as tf
 import tensorflow.contrib.slim as slim
 
 from tensorflow.contrib.layers.python.layers.initializers import variance_scaling_initializer
+from demo import get_silhouette
 
 
 def Encoder_resnet(x, is_training=True, weight_decay=0.001, reuse=False):
@@ -89,6 +90,14 @@ def Encoder_fc3_dropout(x,
 
     variables = tf.contrib.framework.get_variables(scope)
     return net, variables
+
+def get_silhouette_fn(joints,
+                      verts,
+                      cams,
+                      name="silhouette_module"):
+    with tf.variable_scope(name) as scope:
+        result = tf.map_fn(get_silhouette, [joints, verts, cams])
+        return result
 
 
 def get_encoder_fn_separate(model_type):

@@ -121,8 +121,15 @@ def preprocess_image(img_path, json_path=None, ignore_read=False):
 
     return crop, proc_param, img
 
-def get_silhouette(sil, joints, verts, cam):
-    _, proc_param, _ = preprocess_image(sil, ignore_read=True)
+def get_silhouette(joints, verts, cam):
+    # _, proc_param, _ = preprocess_image(sil, ignore_read=True)
+
+    proc_param = {
+        'scale': 1,
+        'start_pt': 0,
+        'end_pt': 224,
+        'img_size': [224, 224]
+    }
 
     cam_for_render, vert_shifted, joints_orig = vis_util.get_original(
         proc_param, verts, cam, joints)

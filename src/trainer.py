@@ -11,7 +11,7 @@ from __future__ import print_function
 from .data_loader import num_examples
 
 from .ops import keypoint_l1_loss, compute_3d_loss, align_by_pelvis, silhouette_l1_loss
-from .models import Discriminator_separable_rotations, get_encoder_fn_separate
+from .models import Discriminator_separable_rotations, get_encoder_fn_separate, get_silhouette_fn
 
 from .tf_smpl.batch_lbs import batch_rodrigues
 from .tf_smpl.batch_smpl import SMPL
@@ -384,8 +384,11 @@ class HMRTrainer(object):
                 ))
 
                 if self.use_sil:
-                    loss_sil.append(self.silhouette_loss(self.sil1_loader, Js1, verts1, cams1) +
-                                    self.silhouette_loss(self.sil2_loader, Js2, verts2, cams2))
+                    sil1 = get_silhouette_fn(Js1, verts1, cams1)
+                    sil2 = get_silhouette_fn(Js2, verts2, cams2)
+
+                    loss_sil.append(self.silhouette_loss(self.sil1_loader, sil1) +
+                                    self.silhouette_loss(self.sil2_loader, sil2))
 
                 # pred_Rs = tf.reshape(pred_Rs, [-1, 24, 9])
                 # if self.use_3d_label:

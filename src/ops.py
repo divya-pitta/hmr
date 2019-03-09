@@ -11,23 +11,30 @@ import numpy as np
 from demo import get_silhouette
 
 # Assuming the silhouette is of the exact same size as the image in input!!!!! Else this will fail.
-def silhouette_l1_loss(sil_gt, joints, vertices, cams, name=None):
-    #TODO: Make this faster using batch operations!!!
-    with tf.name_scope(name, "keypoint_l1_loss", [sil_gt, joints, vertices, cams]):
-        sils = []
-        for index in range(sil_gt.shape[0]):
-            inv_sil = get_silhouette(
-                sil_gt[index],
-                joints[index],
-                vertices[index],
-                cams[index]
-            )
-            # Inverting 0s and 1s
-            sil = 1 / (2e-5 + inv_sil)
-            #Normalizing to between 0 and 1
-            sil = (sil - np.min(sil))/(np.max(sil) - np.min(sil))
-            sils.append(sil)
-        res = tf.losses.absolute_difference(sil_gt, sils)
+# def silhouette_l1_loss(sil_gt, joints, vertices, cams, name=None):
+#     #TODO: Make this faster using batch operations!!!
+#     with tf.name_scope(name, "keypoint_l1_loss", [sil_gt, joints, vertices, cams]):
+#         sils = []
+#         for index in range(sil_gt.shape[0]):
+#             inv_sil = get_silhouette(
+#                 # sil_gt[index],
+#                 joints[index],
+#                 vertices[index],
+#                 cams[index]
+#             )
+#             # Inverting 0s and 1s
+#             sil = 1 / (2e-5 + inv_sil)
+#             #Normalizing to between 0 and 1
+#             sil = (sil - np.min(sil))/(np.max(sil) - np.min(sil))
+#             sils.append(sil)
+#         res = tf.losses.absolute_difference(sil_gt, sils)
+#         return res
+
+def silhouette_l1_loss(sil_gt, sil, name=None):
+    with tf.name_scope(name, "keypoint_l1_loss", [sil_gt, sil]):
+        sil_gt = tf.reshape(sil_gt, (-1,3))
+        sil = tf.reshape(sil, (-1,3))
+        res = -1*tf.losses.absolute_difference(sil_gt, sil)
         return res
 
 def keypoint_l1_loss(kp_gt, kp_pred, scale=1., name=None):
