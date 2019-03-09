@@ -8,6 +8,7 @@ from __future__ import print_function
 
 import numpy as np
 import cv2
+import tensorflow as tf
 
 from opendr.camera import ProjectPoints
 from opendr.renderer import ColoredRenderer
@@ -269,6 +270,32 @@ def render_model(verts,
 
 
 # ------------------------------
+
+def get_original_tf(proc_param, verts, cam, joints, img_size, name=None):
+    with tf.variable_scope(name) as scope:
+        img_size = proc_param['img_size']
+        undo_scale = 1. / np.array(proc_param['scale'])
+
+        cam_s = cam[0]
+        cam_pos = cam[1:]
+        principal_pt = np.array([img_size, img_size]) / 2.
+        flength = 500.
+        tz = flength / (0.5 * img_size * cam_s)
+        trans = np.hstack([cam_pos, tz])
+        vert_shifted = verts + trans
+
+        start_pt = proc_param['start_pt'] - 0.5 * img_size
+        final_principal_pt = (principal_pt + start_pt) * undo_scale
+        cam_for_render = np.hstack(
+            [np.mean(flength * undo_scale), final_principal_pt])
+
+        # This is in padded image.
+        # kp_original = (joints + proc_param['start_pt']) * undo_scale
+        # Subtract padding from joints.
+        margin = int(img_size / 2)
+        kp_original = (joints + proc_param['start_pt'] - margin) * undo_scale
+
+        return cam_for_render, vert_shifted, kp_original
 
 
 def get_original(proc_param, verts, cam, joints, img_size):

@@ -133,7 +133,7 @@ def get_silhouette(elems):
         'img_size': [224, 224]
     }
 
-    cam_for_render, vert_shifted, joints_orig = vis_util.get_original(
+    cam_for_render, vert_shifted, joints_orig = vis_util.get_original_tf(
         proc_param, verts, cam, joints, proc_param['img_size'])
 
     renderer = vis_util.SMPLRenderer()
