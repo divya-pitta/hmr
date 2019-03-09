@@ -19,7 +19,9 @@ import tensorflow as tf
 import tensorflow.contrib.slim as slim
 
 from tensorflow.contrib.layers.python.layers.initializers import variance_scaling_initializer
-from demo import get_silhouette
+#import sys
+#sys.path.append('..')
+#from demo import get_silhouette
 
 
 def Encoder_resnet(x, is_training=True, weight_decay=0.001, reuse=False):
@@ -69,7 +71,7 @@ def Encoder_fc3_dropout(x,
       if orthogonal: 
            either 85: (3 + 24*3 + 10) or 109 (3 + 24*4 + 10) for factored axis-angle representation
       if perspective:
-          86: (f, tx, ty, tz) + 24*3 + 10, or 110 for factored axis-angle.
+         86: (f, tx, ty, tz) + 24*3 + 10, or 110 for factored axis-angle.
     - variables: tf variables
     """
     if reuse:
@@ -95,8 +97,9 @@ def get_silhouette_fn(joints,
                       verts,
                       cams,
                       name="silhouette_module"):
+    from demo import get_silhouette
     with tf.variable_scope(name) as scope:
-        result = tf.map_fn(get_silhouette, [joints, verts, cams])
+        result = tf.map_fn(get_silhouette, (joints, verts, cams), dtype=(tf.float32, tf.float32, tf.float32))
         return result
 
 

@@ -8,7 +8,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 import numpy as np
-from demo import get_silhouette
+#from demo import get_silhouette
 
 # Assuming the silhouette is of the exact same size as the image in input!!!!! Else this will fail.
 # def silhouette_l1_loss(sil_gt, joints, vertices, cams, name=None):
