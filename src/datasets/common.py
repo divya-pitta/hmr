@@ -217,6 +217,98 @@ def convert_to_example_wmosh(image_data, image_path, height, width, label,
     return example
 
 
+def convert_to_example_wmosh_h36m(image_data, image_path, height, width, label,
+                             center, gt3d, pose, shape, scale_factors,
+                             start_pt, gt3ds_univ, cam_intr, cam_intr_univ):
+    """Build an Example proto for an image example.
+    Args:
+      image_data: string, JPEG encoding of RGB image;
+      image_path: string, path to this image file
+      labels: 3 x 14 joint location + visibility
+      height, width: integers, image shapes in pixels.
+      center: 2 x 1 center of the tight bbox
+      gt3d: 14x3 3D joint locations
+      scale_factors: 2 x 1, scale factor used to scale image.
+      start_pt: the left corner used to crop the _scaled_ image to 300x300
+      cam_intr: [alpha_x, x_o, alpha_y, y_0]
+      		Calculated as: 
+		
+	   def infer_camera_intrinsics(points2d, points3d):
+        	Infer camera instrinsics from 2D<->3D point correspondences.
+        	pose2d = points2d.reshape(-1, 2)
+        	pose3d = points3d.reshape(-1, 3)
+        	x3d = np.stack([pose3d[:, 0], pose3d[:, 2]], axis=-1)
+        	x2d = (pose2d[:, 0] * pose3d[:, 2])
+        	alpha_x, x_0 = list(np.linalg.lstsq(x3d, x2d, rcond=-1)[0].flatten())
+        	y3d = np.stack([pose3d[:, 1], pose3d[:, 2]], axis=-1)
+        	y2d = (pose2d[:, 1] * pose3d[:, 2])
+        	alpha_y, y_0 = list(np.linalg.lstsq(y3d, y2d, rcond=-1)[0].flatten())
+        	return np.array([alpha_x, x_0, alpha_y, y_0])
+    cam_intr: same as cam_intr except it's calculated with gt3ds_univ
+    Returns:
+      Example proto
+    """
+    from os.path import basename
+    image_format = 'JPEG'
+    if label.shape[0] != 3:
+        label = label.T
+#    if label.shape[1] > 14:
+#        print('This shouldnt be happening')
+#        import ipdb
+#        ipdb.set_trace()
+    if pose is None:
+        has_3d = 0
+        # Use -1 to save.
+        pose = -np.ones(72)
+        shape = -np.ones(10)
+    else:
+        has_3d = 1
+
+    example = tf.train.Example(
+        features=tf.train.Features(feature={
+            'image/height':
+            int64_feature(height),
+            'image/width':
+            int64_feature(width),
+            'image/center':
+            int64_feature(center.astype(np.int)),
+            'image/x':
+            float_feature(label[0, :].astype(np.float)),
+            'image/y':
+            float_feature(label[1, :].astype(np.float)),
+            'image/visibility':
+            int64_feature(label[2, :].astype(np.int)),
+            'image/format':
+            bytes_feature(tf.compat.as_bytes(image_format)),
+            'image/filename':
+            bytes_feature(tf.compat.as_bytes(basename(image_path))),
+            'image/encoded':
+            bytes_feature(tf.compat.as_bytes(image_data)),
+            'mosh/pose':
+            float_feature(pose.astype(np.float)),
+            'mosh/shape':
+            float_feature(shape.astype(np.float)),
+            'mosh/gt3d':
+            float_feature(gt3d.ravel().astype(np.float)),
+            'meta/scale_factors':
+            float_feature(np.array(scale_factors).astype(np.float)),
+            'meta/crop_pt':
+            int64_feature(start_pt.astype(np.int)),
+            'meta/has_3d':
+            int64_feature(has_3d),
+            'image/cam_intr':
+            float_feature(cam_intr.astype(np.float)),
+	    'image/cam_intr_univ':
+            float_feature(cam_intr_univ.astype(np.float)),
+            'mosh/gt3d_univ':
+            float_feature(gt3ds_univ.ravel().astype(np.float)),
+
+        }))
+
+    return example
+
+
+
 def resize_img(img, scale_factor):
     import cv2
     import numpy as np
