@@ -220,7 +220,7 @@ def process_h36m_train(data_dir, out_dir, is_train=False):
                 continue
 
             out_path = join(out_dir, '{}_{}_{}_cam{}_train_%04d.tfrecord'.format(subject,
-                            action, subaction, cam_dict[camera]))
+                            metadata.action_names[action], subaction, cam_dict[camera]))
                 
             img_paths, gt2ds, gt3ds, gt3ds_univ, cam_intr, cam_intr_univ, camera = get_all_data(
                     data_dir, subject, action, subaction, camera)
