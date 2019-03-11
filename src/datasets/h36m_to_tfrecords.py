@@ -15,6 +15,7 @@ from common import convert_to_example_wmosh_h36m, ImageCoder, resize_img
 
 from metadata import load_h36m_metadata
 
+# To check the details of annot.h5 file (format, what it contains, calculations etc), visit: https://github.com/anibali/h36m-fetch/blob/master/process_all.py
 
 metadata = load_h36m_metadata()
 
