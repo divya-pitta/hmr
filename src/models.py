@@ -106,34 +106,6 @@ def Encoder_fc3_dropout(x,
 #         result = tf.map_fn(get_silhouette, (joints, verts, cams), dtype=(tf.float32, tf.float32, tf.float32))
 #         return result
 
-def get_singlemesh_from_vertex(self, vert,
-                               name='get_mesh_single'):
-    """
-
-    :param vert: 6890 x 3
-    :param name:
-    :return: mesh of a single instance: 13716 x 3 x 3
-    """
-    with tf.variable_scope(name) as scope:
-        result = tf.map_fn(
-            lambda x: tf.stack([vert[x[0]], vert[x[1]], vert[x[2]]]),
-            self.faces, dtype=tf.float32)
-        return result
-
-def get_mesh_from_verts(self, verts,
-                        name='get_verts'):
-    """
-    Takes vertices and returns mesh
-    :param verts: N x 6890 x 3
-    :param name:
-    :return: mesh: N x 13716 x 3 x 3
-    """
-    with tf.variable_scope(name) as scope:
-        result = tf.map_fn(
-            get_singlemesh_from_vertex,
-            self.verts, dtype=tf.float32)
-        return result
-
 def get_camera_matrix(cam):
     camera_pose = RotoTranslation(rotation=Vector(x=90., y=0., z=0.),
                                   translation=Vector(x=cam[1], y=cam[2], z=(5/(cam[0]+1e-5))),

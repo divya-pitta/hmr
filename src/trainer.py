@@ -12,7 +12,7 @@ from .data_loader import num_examples
 
 from .ops import keypoint_l1_loss, compute_3d_loss, align_by_pelvis, silhouette_l1_loss
 from .models import Discriminator_separable_rotations, get_encoder_fn_separate, \
-    get_silhouette_fn, get_mesh_from_verts
+    get_silhouette_fn
 
 from .tf_smpl.batch_lbs import batch_rodrigues
 from .tf_smpl.batch_smpl import SMPL
@@ -147,6 +147,10 @@ class HMRTrainer(object):
         self.e_3d_weight = config.e_3d_weight
 
         self.optimizer = tf.train.AdamOptimizer
+
+        # Loading faces
+        data_faces = np.load("tf_smpl/smpl_faces.npy")
+        self.faces = tf.convert_to_tensor(data_faces, dtype=tf.float32)
 
         # Instantiate SMPL
         self.smpl = SMPL(self.smpl_model_path)
@@ -485,6 +489,36 @@ class HMRTrainer(object):
         self.setup_summaries(loss_kps)
 
         print('Done initializing trainer!')
+
+    def get_singlemesh_from_vertex(self,
+                                   vert,
+                                   name='get_mesh_single'):
+        """
+
+        :param vert: 6890 x 3
+        :param name:
+        :return: mesh of a single instance: 13716 x 3 x 3
+        """
+        with tf.variable_scope(name) as scope:
+            result = tf.map_fn(
+                lambda x: tf.stack([vert[x[0]], vert[x[1]], vert[x[2]]]),
+                self.faces, dtype=tf.float32)
+            return result
+
+    def get_mesh_from_verts(self,
+                            verts,
+                            name='get_verts'):
+        """
+        Takes vertices and returns mesh
+        :param verts: N x 6890 x 3
+        :param name:
+        :return: mesh: N x 13716 x 3 x 3
+        """
+        with tf.variable_scope(name) as scope:
+            result = tf.map_fn(
+                self.get_singlemesh_from_vertex,
+                verts, dtype=tf.float32)
+            return result
 
     def setup_summaries(self, loss_kps):
         # Prepare Summary
