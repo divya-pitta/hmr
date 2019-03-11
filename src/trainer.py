@@ -11,7 +11,8 @@ from __future__ import print_function
 from .data_loader import num_examples
 
 from .ops import keypoint_l1_loss, compute_3d_loss, align_by_pelvis, silhouette_l1_loss
-from .models import Discriminator_separable_rotations, get_encoder_fn_separate, get_silhouette_fn
+from .models import Discriminator_separable_rotations, get_encoder_fn_separate, \
+    get_silhouette_fn, get_mesh_from_verts
 
 from .tf_smpl.batch_lbs import batch_rodrigues
 from .tf_smpl.batch_smpl import SMPL
@@ -31,6 +32,11 @@ import deepdish as dd
 
 # For drawing
 from .util import renderer as vis_util
+
+# For rendering mesh in 2D
+from differentiable_renderer.rastering import Rasterer
+from differentiable_renderer.rastering import RotoTranslation
+from differentiable_renderer.rastering import Vector
 
 
 class HMRTrainer(object):
@@ -304,6 +310,7 @@ class HMRTrainer(object):
                 if self.use_3d_label:
                     loss_poseshape, loss_joints = self.get_3d_loss(
                         pred_Rs, shapes, Js)
+
                     loss_3d_params.append(loss_poseshape)
                     loss_3d_joints.append(loss_joints)
 
@@ -412,6 +419,10 @@ class HMRTrainer(object):
 
         if not self.encoder_only and not self.two_pose:
             self.setup_discriminator(fake_rotations, fake_shapes)
+
+        if self.two_pose:
+            mesh1 = get_mesh_from_verts(verts1)
+            render1_2d = get_silhouette_fn(mesh1, cams1)
 
         # Gather losses.
         with tf.name_scope("gather_e_loss"):

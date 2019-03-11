@@ -23,6 +23,10 @@ from tensorflow.contrib.layers.python.layers.initializers import variance_scalin
 #sys.path.append('..')
 #from demo import get_silhouette
 
+from differentiable_renderer.rastering import RotoTranslation
+from differentiable_renderer.rastering import Vector
+from differentiable_renderer.rastering import Rasterer
+
 
 def Encoder_resnet(x, is_training=True, weight_decay=0.001, reuse=False):
     """
@@ -93,14 +97,70 @@ def Encoder_fc3_dropout(x,
     variables = tf.contrib.framework.get_variables(scope)
     return net, variables
 
-def get_silhouette_fn(joints,
-                      verts,
+# def get_silhouette_fn(joints,
+#                       verts,
+#                       cams,
+#                       name="silhouette_module"):
+#     from demo import get_silhouette
+#     with tf.variable_scope(name) as scope:
+#         result = tf.map_fn(get_silhouette, (joints, verts, cams), dtype=(tf.float32, tf.float32, tf.float32))
+#         return result
+
+def get_singlemesh_from_vertex(self, vert,
+                               name='get_mesh_single'):
+    """
+
+    :param vert: 6890 x 3
+    :param name:
+    :return: mesh of a single instance: 13716 x 3 x 3
+    """
+    with tf.variable_scope(name) as scope:
+        result = tf.map_fn(
+            lambda x: tf.stack([vert[x[0]], vert[x[1]], vert[x[2]]]),
+            self.faces, dtype=tf.float32)
+        return result
+
+def get_mesh_from_verts(self, verts,
+                        name='get_verts'):
+    """
+    Takes vertices and returns mesh
+    :param verts: N x 6890 x 3
+    :param name:
+    :return: mesh: N x 13716 x 3 x 3
+    """
+    with tf.variable_scope(name) as scope:
+        result = tf.map_fn(
+            get_singlemesh_from_vertex,
+            self.verts, dtype=tf.float32)
+        return result
+
+def get_camera_matrix(cam):
+    camera_pose = RotoTranslation(rotation=Vector(x=90., y=0., z=0.),
+                                  translation=Vector(x=cam[1], y=cam[2], z=(5/(cam[0]+1e-5))),
+                                  angle_unit='degrees')
+    return camera_pose.matrix
+
+def get_silhouette_fn(meshes,
                       cams,
                       name="silhouette_module"):
-    from demo import get_silhouette
+    """
+    Takes mesh and camera parameters to give the 2d silhouette of the image
+    :param meshes: N x 13716 x 3 x 3
+    :param cams: N x 3
+    :param name:
+    :return: Returns the 2d rendered image of the mesh w.r.t cam parames of N x 224 x 224
+    """
     with tf.variable_scope(name) as scope:
-        result = tf.map_fn(get_silhouette, (joints, verts, cams), dtype=(tf.float32, tf.float32, tf.float32))
-        return result
+        camera_intrinsics = {'resolution_px': (128, 128), 'resolution_mm': (32, 32), 'focal_len_mm': 5}
+        cam_matrix = tf.map_fn(get_camera_matrix, cams)
+        renderer = Rasterer(meshes=meshes,
+                            resolution_px=camera_intrinsics['resolution_px'],
+                            resolution_mm=camera_intrinsics['resolution_mm'],
+                            focal_len_mm=camera_intrinsics['focal_len_mm'],
+                            pl_camera_pose=cam_matrix,
+                            pl_model_idx=tf.range(meshes.shape[0]),
+                            max_triangles=14000)
+        return renderer.image
 
 
 def get_encoder_fn_separate(model_type):
