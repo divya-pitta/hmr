@@ -64,6 +64,8 @@ class SMPLRenderer(object):
             k=np.zeros(5),
             c=cam[1:3])
 
+        use_cam = ProjectPoints(f=cam[0] * np.ones(2), rt=np.zeros(3), t=np.zeros(3), k=np.zeros(5), c=cam[1:3])
+
         if near is None:
             near = np.maximum(np.min(verts[:, 2]) - 25, 0.1)
         if far is None:
@@ -245,7 +247,7 @@ def render_model(verts,
                  do_alpha=False,
                  color_id=None,
                  light_color=None):
-    rn = _create_renderer(
+    rn = _create_rend erer(
         w=w, h=h, near=near, far=far, rt=cam.rt, t=cam.t, f=cam.f, c=cam.c)
 
     # Uses img as background, otherwise white background.
@@ -279,9 +281,11 @@ def get_original_tf(proc_param, verts, cam, joints, img_size, name=None):
         cam_s = cam[0]
         cam_pos = cam[1:]
         principal_pt = np.array([img_size, img_size]) / 2.
-        flength = 500.
-        tz = flength / (0.5 * img_size * cam_s)
-        trans = np.hstack([cam_pos, tz])
+        flength = tf.constant(500.)
+        tz = flength / tf.multiply(tf.constant(0.5), tf.multiply(tf.cast(img_size,tf.float32), cam_s))
+        tz = tf.reshape(tz, [1])
+        #trans = np.hstack([cam_pos, tz])
+        trans = tf.concat([cam_pos, tz], 0)
         vert_shifted = verts + trans
 
         start_pt = proc_param['start_pt'] - 0.5 * img_size
@@ -311,16 +315,18 @@ def get_original(proc_param, verts, cam, joints, img_size):
     vert_shifted = verts + trans
 
     start_pt = proc_param['start_pt'] - 0.5 * img_size
-    final_principal_pt = (principal_pt + start_pt) * undo_scale
-    cam_for_render = np.hstack(
-        [np.mean(flength * undo_scale), final_principal_pt])
+    final_principal_pt = (principal_pt + start_pt) * undo_scale #dim 2
+
+    # cam_for_render = np.hstack(
+    #     [np.mean(flength * undo_scale), final_principal_pt]) #dim 3
+    cam_for_render = tf.concat([tf.reshape((flength * undo_scale), [1]), final_principal_pt], 0)
 
     # This is in padded image.
     # kp_original = (joints + proc_param['start_pt']) * undo_scale
     # Subtract padding from joints.
-    margin = int(img_size / 2)
-    kp_original = (joints + proc_param['start_pt'] - margin) * undo_scale
-
+    margin = int(img_size / 2) #scalar
+    # kp_original = (joints + proc_param['start_pt'] - margin) * undo_scale #19x2
+    kp_original = (joints[:, :2] + proc_param['start_pt'] - np.array([margin, margin])) * undo_scale
     return cam_for_render, vert_shifted, kp_original
 
 

@@ -150,7 +150,7 @@ class HMRTrainer(object):
 
         # Loading faces
         data_faces = np.load("tf_smpl/smpl_faces.npy")
-        self.faces = tf.convert_to_tensor(data_faces, dtype=tf.float32)
+        self.faces = tf.convert_to_tensor(data_faces, dtype=tf.int32)
 
         # Instantiate SMPL
         self.smpl = SMPL(self.smpl_model_path)
@@ -425,7 +425,7 @@ class HMRTrainer(object):
             self.setup_discriminator(fake_rotations, fake_shapes)
 
         if self.two_pose:
-            mesh1 = get_mesh_from_verts(verts1)
+            mesh1 = self.get_mesh_from_verts(verts1)
             render1_2d = get_silhouette_fn(mesh1, cams1)
 
         # Gather losses.
