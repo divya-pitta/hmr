@@ -149,7 +149,7 @@ class HMRTrainer(object):
         self.optimizer = tf.train.AdamOptimizer
 
         # Loading faces
-        data_faces = np.load("tf_smpl/smpl_faces.npy")
+        data_faces = np.load("/hpevol/hmr/src/tf_smpl/smpl_faces.npy")
         self.faces = tf.convert_to_tensor(data_faces, dtype=tf.int32)
 
         # Instantiate SMPL

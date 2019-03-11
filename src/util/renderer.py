@@ -247,7 +247,7 @@ def render_model(verts,
                  do_alpha=False,
                  color_id=None,
                  light_color=None):
-    rn = _create_rend erer(
+    rn = _create_renderer(
         w=w, h=h, near=near, far=far, rt=cam.rt, t=cam.t, f=cam.f, c=cam.c)
 
     # Uses img as background, otherwise white background.
