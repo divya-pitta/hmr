@@ -38,6 +38,7 @@ from differentiable_renderer.rastering import Rasterer
 from differentiable_renderer.rastering import RotoTranslation
 from differentiable_renderer.rastering import Vector
 
+import pdb
 
 class HMRTrainer(object):
     def __init__(self, config, data_loader, mocap_loader):
@@ -499,7 +500,9 @@ class HMRTrainer(object):
         :param name:
         :return: mesh of a single instance: 13716 x 3 x 3
         """
-        with tf.variable_scope(name) as scope:
+        #tf.Print(vert)
+	#tf.Print(vert.dtype)
+	with tf.variable_scope(name) as scope:
             result = tf.map_fn(
                 lambda x: tf.stack([vert[x[0]], vert[x[1]], vert[x[2]]]),
                 self.faces, dtype=tf.float32)
@@ -775,10 +778,13 @@ class HMRTrainer(object):
                             "summary_occasional":
                             self.summary_op_occ
                         })
-
+		from tensorflow.python import debug as tf_debug
                 t0 = time()
+		#pdb.set_trace()
+		#sess = tf_debug.LocalCLIDebugWrapperSession(sess)
                 result = sess.run(fetch_dict)
-                t1 = time()
+                #pdb.set_trace()
+		t1 = time()
 
                 self.summary_writer.add_summary(
                     result['summary'], global_step=result['step'])
