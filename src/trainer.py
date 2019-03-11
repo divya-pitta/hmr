@@ -426,7 +426,7 @@ class HMRTrainer(object):
 
         if self.two_pose:
             mesh1 = self.get_mesh_from_verts(verts1)
-            render1_2d = get_silhouette_fn(mesh1, cams1)
+            self.render1_2d = get_silhouette_fn(mesh1, cams1)
 
         # Gather losses.
         with tf.name_scope("gather_e_loss"):
@@ -744,7 +744,8 @@ class HMRTrainer(object):
                     "e_loss": self.e_loss,
                     # The meat
                     "e_opt": self.e_opt,
-                    "loss_kp": self.e_loss_kp
+                    "loss_kp": self.e_loss_kp,
+                    "render_2d": self.render1_2d
                 }
                 if not self.encoder_only:
                     fetch_dict.update({
@@ -784,6 +785,11 @@ class HMRTrainer(object):
 
                 e_loss = result['e_loss']
                 step = result['step']
+
+                import matplotlib.pyplot as plt
+                render_2d_img = result['render_2d']
+                for i in range(5):
+                    plt.imsave('{0}-rendered_2d.png'.format(i), render_2d_img[i])
 
                 epoch = float(step) / self.num_itr_per_epoch
                 if self.encoder_only:
