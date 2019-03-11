@@ -126,6 +126,8 @@ def get_silhouette_fn(meshes,
     """
     with tf.variable_scope(name) as scope:
         camera_intrinsics = {'resolution_px': (128, 128), 'resolution_mm': (32, 32), 'focal_len_mm': 5}
+        trans = tf.get_variable("trans", shape=(4,4), dtype=tf.float32, initializer=tf.eye)
+        print(trans)
         cam_matrix = tf.map_fn(get_camera_matrix, cams)
         renderer = Rasterer(meshes=meshes,
                             resolution_px=camera_intrinsics['resolution_px'],
