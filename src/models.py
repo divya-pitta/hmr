@@ -109,7 +109,9 @@ def Encoder_fc3_dropout(x,
 def get_camera_matrix(cam):
     camera_pose = RotoTranslation(rotation=Vector(x=90., y=0., z=0.),
                                   translation=Vector(x=cam[1], y=cam[2], z=(5/(cam[0]+1e-5))),
+                                  # translation=Vector(x=0., y=-8., z=0.),
                                   angle_unit='degrees')
+    # camera_pose.s
     return camera_pose.matrix
 
 def get_silhouette_fn(meshes,
