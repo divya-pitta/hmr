@@ -124,9 +124,12 @@ def get_silhouette_fn(meshes,
     :param name:
     :return: Returns the 2d rendered image of the mesh w.r.t cam parames of N x 224 x 224
     """
+    def _initializer(shape, dtype=dtype, partition_info=None):
+        return tf.eye(shape, dtype=tf.float32)
+
     with tf.variable_scope(name) as scope:
         camera_intrinsics = {'resolution_px': (128, 128), 'resolution_mm': (32, 32), 'focal_len_mm': 5}
-        trans = tf.get_variable("trans", shape=(4,4), dtype=tf.float32, initializer=tf.eye)
+        trans = tf.get_variable("trans", shape=(4,4), dtype=tf.float32, initializer=_initializer)
         print(trans)
         cam_matrix = tf.map_fn(get_camera_matrix, cams)
         renderer = Rasterer(meshes=meshes,
