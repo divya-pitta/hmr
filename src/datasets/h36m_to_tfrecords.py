@@ -22,7 +22,7 @@ metadata = load_h36m_metadata()
 tf.app.flags.DEFINE_string('data_directory', '/hpdata/h36m-fetch/processed',
                            'data directory: top of mpi-inf-3dhp')
 tf.app.flags.DEFINE_string('output_directory',
-                           '/hpdata/tf_datasets/h36m/',
+                           '/hpdata/tf_datasets_new/h36m/',
                            'Output data directory')
 
 tf.app.flags.DEFINE_string('split', 'train', 'train or trainval')
