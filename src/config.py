@@ -56,8 +56,10 @@ flags.DEFINE_string(
 # Training settings:
 # TODO! If you want to train, change this to your 'tf_datasets' or specify it with the flag.
 DATA_DIR = '/scratch1/projects/tf_datasets/'
+PAIRED_DATA_DIR = '/pairedhpe/'
 
 flags.DEFINE_string('data_dir', DATA_DIR, 'Where to save training models')
+flags.DEFINE_string('paired_data_dir', PAIRED_DATA_DIR, 'Where to get the paired data dir from')
 flags.DEFINE_string('log_dir', 'logs', 'Where to save training models')
 flags.DEFINE_string('model_dir', None, 'Where model will be saved -- filled automatically')
 flags.DEFINE_integer('log_img_step', 100, 'How often to visualize img during training')

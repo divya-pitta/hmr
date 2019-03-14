@@ -50,6 +50,7 @@ class DataLoader(object):
         self.use_3d_label = config.use_3d_label
 
         self.dataset_dir = config.data_dir
+        self.paireddata_dir = config.paired_data_dir
         self.datasets = config.datasets
         self.mocap_datasets = config.mocap_datasets
         self.batch_size = config.batch_size
@@ -112,7 +113,7 @@ class DataLoader(object):
           image_batch: batched images im1, im2 as per data_format
           label_batch: batched keypoint kps1, kps2 labels N x K x 3
         """
-        files = data_utils.get_all_files_paired(self.dataset_dir, ['paired_h36m'])
+        files = data_utils.get_all_files_paired(self.paireddata_dir, ['paired_h36m'])
 	do_shuffle = True
         fqueue = tf.train.string_input_producer(
             files, shuffle=do_shuffle, name="input")
@@ -319,7 +320,7 @@ class DataLoader(object):
                 image2, image_size2, label2, center2, fname2, pose2, shape2, gt3d2, has_smpl3d2, = \
                 data_utils.parse_example_paired_proto(example_serialized, has_3d=has_3d)
 
-		image1, label1, pose1, gt3d1 = self.mage_preprocessing_paired(
+		image1, label1, pose1, gt3d1 = self.image_preprocessing_paired(
                     image1, image_size1, label1, center1, pose=pose1, gt3d=gt3d1)
             	image2, label2, pose2, gt3d2 = self.image_preprocessing_paired(
                     image2, image_size2, label2, center2, pose=pose2, gt3d=gt3d2)
