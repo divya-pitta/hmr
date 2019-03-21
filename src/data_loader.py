@@ -426,15 +426,46 @@ class DataLoader(object):
                                    center,
                                    pose=None,
                                    gt3d=None):
-        margin = tf.to_int32(self.output_size / 2)
         with tf.name_scope(None, 'image_preprocessing',
                            [image, image_size, label, center]):
             visibility = label[2, :]
             keypoints = label[:2, :]
+
+            # Pre-preprocessing
+            min_pt = tf.reduce_min(keypoints[:, :14], axis=1)
+            max_pt = tf.reduce_max(keypoints[:, :14], axis=1)
+            person_height = tf.norm(max_pt - min_pt)
+            center = (min_pt + max_pt) / 2.
+            scale = 150. / person_height
+            image, keypoints, center = data_utils.jitter_scale(
+                image, image_size, keypoints, center, [scale, scale])
+
+            margin = 150
+            start_pt = tf.nn.relu(center - margin)
+            end_pt = center + margin
+            end_pt = tf.stack([end_pt, tf.convert_to_tensor(
+                [tf.cast(tf.shape(image)[1], tf.int32), tf.cast(tf.shape(image)[0], tf.int32)])])
+            end_pt = tf.reduce_min(end_pt, reduction_indices=[0])
+            total_size = end_pt - start_pt
+
+            image = tf.image.crop_to_bounding_box(
+                image,
+                start_pt[1],
+                start_pt[0],
+                total_size[1], total_size[0])
+
+            kx = keypoints[0, :] - tf.cast(start_pt[0], tf.float32)
+            ky = keypoints[1, :] - tf.cast(start_pt[1], tf.float32)
+            keypoints = tf.stack([kx, ky])
+            center -= start_pt
+            image_size = tf.shape(image)[:2]
+
+            # Original pre-processing similar to Angjoo image_preprocessing
+            margin = tf.to_int32(self.output_size / 2)
             # No random jitter
             # Randomly scale but specify the scale to be only 1
             image, keypoints, center = data_utils.jitter_scale(
-                image, image_size, keypoints, center, [0.5, 0.5])
+                image, image_size, keypoints, center, [1, 1])
 
             # Do we want to pad the image?-  Removed the trans_max here
             margin_safe = margin + 50
