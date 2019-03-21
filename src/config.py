@@ -20,7 +20,7 @@ import numpy as np
 
 curr_path = osp.dirname(osp.abspath(__file__))
 model_dir = osp.join(curr_path, '..', 'models')
-logs_dir = '/hmrvol/hmr/logs/HMR_h36m-lsp_resnet_fc3_dropout_Elr1e-05_kp-weight60_Feb26_0818'
+logs_dir = '/hpdata/tensorboard/logs/mlp_tps'
 if not osp.exists(model_dir):
     print('Fix path to models/')
     import ipdb
@@ -55,8 +55,8 @@ flags.DEFINE_string(
 
 # Training settings:
 # TODO! If you want to train, change this to your 'tf_datasets' or specify it with the flag.
-DATA_DIR = '/scratch1/projects/tf_datasets/'
-PAIRED_DATA_DIR = '/pairedhpe/'
+DATA_DIR = '/hpe/copy/hmr/data/test_tf_datasets/'
+PAIRED_DATA_DIR = '/hpe/copy/'
 
 flags.DEFINE_string('data_dir', DATA_DIR, 'Where to save training models')
 flags.DEFINE_string('paired_data_dir', PAIRED_DATA_DIR, 'Where to get the paired data dir from')
