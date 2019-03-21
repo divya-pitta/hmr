@@ -434,7 +434,7 @@ class DataLoader(object):
             # No random jitter
             # Randomly scale but specify the scale to be only 1
             image, keypoints, center = data_utils.jitter_scale(
-                image, image_size, keypoints, center, [1, 1])
+                image, image_size, keypoints, center, [0.5, 0.5])
 
             # Do we want to pad the image?-  Removed the trans_max here
             margin_safe = margin + 50

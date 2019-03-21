@@ -387,16 +387,16 @@ class HMRTrainer(object):
                     loss_sil.append(self.silhouette_loss(self.sil1_loader, Js1, verts1, cams1) +
                                     self.silhouette_loss(self.sil2_loader, Js2, verts2, cams2))
 
-                # pred_Rs = tf.reshape(pred_Rs, [-1, 24, 9])
-                # if self.use_3d_label:
-                #     loss_poseshape, loss_joints = self.get_3d_loss(
-                #         pred_Rs, shapes, Js)
-                #     loss_3d_params.append(loss_poseshape)
-                #     loss_3d_joints.append(loss_joints)
-                #
-                # # Save pred_rotations for Discriminator
-                # fake_rotations.append(pred_Rs[:, 1:, :])
-                # fake_shapes.append(shapes)
+                pred_Rs1 = tf.reshape(pred_Rs1, [-1, 24, 9])
+                if self.use_3d_label:
+                     loss_poseshape1, loss_joints1 = self.get_3d_loss(
+                         pred_Rs1, shapes1, Js1)
+                     loss_3d_params.append(loss_poseshape1)
+                     loss_3d_joints.append(loss_joints1)
+                
+                # Save pred_rotations for Discriminator
+                fake_rotations.append(pred_Rs1[:, 1:, :])
+                fake_shapes.append(shapes1)
 
                 # Save things for visualiations:
                 self.all_verts.append(tf.gather(verts1, self.show_these))
@@ -407,7 +407,8 @@ class HMRTrainer(object):
                 theta1_prev = theta1_here
                 theta2_prev = theta2_here
 
-        if not self.encoder_only and not self.two_pose:
+        #if not self.encoder_only and not self.two_pose:
+        if not self.encoder_only:
             self.setup_discriminator(fake_rotations, fake_shapes)
 
         # Gather losses.
@@ -641,9 +642,9 @@ class HMRTrainer(object):
         # This is B x H x W x 3
         imgs = result["input_img1"]
         imgs2 = result["input_img2"]
-        # print("Draw results called")
-        # plt.imsave("/endtoendvol/hmr/data/test_tf_datasets/paired_h36m/img1.png", imgs[0])
-        # plt.imsave("/endtoendvol/hmr/data/test_tf_datasets/paired_h36m/img2.png", imgs2[0])
+        #print("Draw results called")
+        #plt.imsave("/hpevol2/hmr/img1.png", imgs[0])
+        #plt.imsave("/hpevol2/hmr/img2.png", imgs2[0])
     # B x 19 x 3
         gt_kps = result["gt_kp1"]
         if self.data_format == 'NCHW':
@@ -738,10 +739,10 @@ class HMRTrainer(object):
                 step = result['step']
 
                 epoch = float(step) / self.num_itr_per_epoch
-                if self.encoder_only:
+                if step % 50 == 0 and self.encoder_only:
                     print("itr %d/(epoch %.1f): time %g, Enc_loss: %.4f" %
                           (step, epoch, t1 - t0, e_loss))
-                else:
+                elif step % 50 == 0:
                     d_loss = result['d_loss']
                     print(
                         "itr %d/(epoch %.1f): time %g, Enc_loss: %.4f, Disc_loss: %.4f"

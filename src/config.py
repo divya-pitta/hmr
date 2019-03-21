@@ -20,7 +20,8 @@ import numpy as np
 
 curr_path = osp.dirname(osp.abspath(__file__))
 model_dir = osp.join(curr_path, '..', 'models')
-logs_dir = '/hmrvol/hmr/logs/HMR_h36m-lsp_resnet_fc3_dropout_Elr1e-05_kp-weight60_Feb26_0818'
+#logs_dir = '/hmrvol/hmr/logs/HMR_h36m-lsp_resnet_fc3_dropout_Elr1e-05_kp-weight60_Feb26_0818'
+logs_dir = '/hpevol2/hmr/logs/HMR_h36m_resnet_fc3_dropout_Elr1e-05_kp-weight60_Dlr1e-04_Mar14_2107'
 if not osp.exists(model_dir):
     print('Fix path to models/')
     import ipdb
@@ -30,7 +31,7 @@ SMPL_FACE_PATH = osp.join(curr_path, '../src/tf_smpl', 'smpl_faces.npy')
 
 # Default pred-trained model path for the demo.
 #PRETRAINED_MODEL = osp.join(model_dir, 'model.ckpt-667589')
-PRETRAINED_MODEL = osp.join(logs_dir, 'model.ckpt-51174')
+PRETRAINED_MODEL = osp.join(logs_dir, 'model.ckpt-41691')
 
 flags.DEFINE_string('smpl_model_path', SMPL_MODEL_PATH,
                     'path to the neurtral smpl model')
@@ -118,7 +119,7 @@ def get_config():
 
     # Do not use the discriminator if using two pose images for shape and pose prediction
     if config.two_pose:
-        config.encoder_only = True
+        #config.encoder_only = True
 	config.use_3d_label = False
     return config
 
