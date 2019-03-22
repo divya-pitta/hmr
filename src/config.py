@@ -55,8 +55,8 @@ flags.DEFINE_string(
 
 # Training settings:
 # TODO! If you want to train, change this to your 'tf_datasets' or specify it with the flag.
-DATA_DIR = '/hpe/copy/hmr/data/test_tf_datasets/'
-PAIRED_DATA_DIR = '/hpe/copy/'
+DATA_DIR = '/hpdata/copy/hmr/data/test_tf_datasets/'
+PAIRED_DATA_DIR = '/hpdata/copy/'
 
 flags.DEFINE_string('data_dir', DATA_DIR, 'Where to save training models')
 flags.DEFINE_string('paired_data_dir', PAIRED_DATA_DIR, 'Where to get the paired data dir from')
