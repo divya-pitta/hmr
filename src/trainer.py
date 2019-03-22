@@ -20,6 +20,7 @@ from .tf_smpl.projection import batch_orth_proj_idrot
 from tensorflow.python.ops import control_flow_ops
 #from tensorflow.contrib.image import interpolate_spline
 from .interpolate_spline import interpolate_spline
+from .train_spline import TrainSpline
 #import interpolate_spline
 
 from time import time
@@ -144,6 +145,7 @@ class HMRTrainer(object):
 
         # Instantiate SMPL
         self.smpl = SMPL(self.smpl_model_path)
+	self.trainSpline = TrainSpline()
         self.E_var = []
         self.build_model()
 
@@ -364,13 +366,15 @@ class HMRTrainer(object):
                     Js2, cams2, name='proj2d_stage%d' % i)
 
                 start_time = time()
-                predJs2 = interpolate_spline(
-                    train_points=Js1,
-                    train_values=Js2,
-                    query_points=Js1,
-                    order=3,
-                   regularization_weight=0.1,
-               )
+#                predJs2 = interpolate_spline(
+#                    train_points=Js1,
+#                    train_values=Js2,
+#                    query_points=Js1,
+#                    order=3,
+#                   regularization_weight=0.1,
+#               )
+
+                predJs2 = self.trainSpline(Js1, Js2, Js1, 3, 0.1)
 
                 print("Time taken by interpolate_spline: ",time()-start_time)
                 predj_kp2 = batch_orth_proj_idrot(
