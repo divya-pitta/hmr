@@ -113,7 +113,7 @@ class DataLoader(object):
           image_batch: batched images im1, im2 as per data_format
           label_batch: batched keypoint kps1, kps2 labels N x K x 3
         """
-        files = data_utils.get_all_files_paired(self.paireddata_dir, ['paired_h36m'])
+        files = data_utils.get_all_files_paired(self.paireddata_dir, [''], 'train')
 	do_shuffle = True
         fqueue = tf.train.string_input_producer(
             files, shuffle=do_shuffle, name="input")
